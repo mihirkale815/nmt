@@ -278,7 +278,7 @@ def train(args: Dict[str, str]):
     cumulative_examples = report_examples = epoch = valid_num = 0
     hist_valid_scores = []
     train_time = begin_time = time.time()
-    print('Starting Maximum Likelihood training')
+    print('Starting Maximum Likelihood training....')
 
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=float(args['--lr']))
 
