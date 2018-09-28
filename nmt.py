@@ -160,7 +160,6 @@ class NMT(nn.Module):
         predictions = predictions.view(batch_size * max_len, vocab_size)
         targets = targets.view(batch_size * max_len)
         loss = self.loss(predictions, targets)
-        #loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>'])(predictions,targets).cuda()
         return loss
 
 
