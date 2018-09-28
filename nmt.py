@@ -58,7 +58,7 @@ from torch import Tensor
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 import os
-
+import torch.cuda as cuda
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 
@@ -77,7 +77,7 @@ class NMT(nn.Module):
         self.bidirectional = False
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-
+        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).cuda()
         self.attention = ConcatAttention(encoder_dim=self.hidden_size,decoder_dim=self.hidden_size)
 
         self.encoder = RNNEncoder(vocab=self.vocab.src,embed_size=self.embed_size,bidirectional=self.bidirectional,
@@ -123,6 +123,8 @@ class NMT(nn.Module):
             decoder_init_state: decoder GRU/LSTM's initial state, computed from source encodings
         """
         source,lens = utils.convert_to_tensor(src_sents,self.vocab.src)
+#        print('input type', type(source))
+        source = source.cuda()
         src_encodings,decoder_init_state = self.encoder(source,lens)
         return src_encodings, decoder_init_state
 
@@ -142,10 +144,11 @@ class NMT(nn.Module):
                 each example in the input batch
         """
         target, lens = utils.convert_to_tensor(tgt_sents,self.vocab.tgt)
+        target = target.cuda()
         batch_size, max_len = target.size()
-        predictions = torch.zeros((batch_size,max_len,len(self.vocab.tgt)))
+        predictions = torch.zeros((batch_size,max_len,len(self.vocab.tgt))).cuda()
         hidden = decoder_init_state
-        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)])
+        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)]).cuda()
         for idx in range(0, max_len):
             outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
             inputs = target[:, idx]
@@ -156,7 +159,8 @@ class NMT(nn.Module):
         batch_size, max_len, vocab_size = predictions.size()
         predictions = predictions.view(batch_size * max_len, vocab_size)
         targets = targets.view(batch_size * max_len)
-        loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>'])(predictions,targets)
+        loss = self.loss(predictions, targets)
+        #loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>'])(predictions,targets).cuda()
         return loss
 
 
@@ -269,8 +273,8 @@ def train(args: Dict[str, str]):
     model = NMT(embed_size=int(args['--embed-size']),
                 hidden_size=int(args['--hidden-size']),
                 dropout_rate=float(args['--dropout']),
-                vocab=vocab)
-
+                vocab=vocab).cuda()
+    print('model',type(model))
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0
     cumulative_examples = report_examples = epoch = valid_num = 0
