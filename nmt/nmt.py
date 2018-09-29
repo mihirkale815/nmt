@@ -194,7 +194,7 @@ class NMT(nn.Module):
             
                 outputs = (outputs+values).view(-1)
 
-            # Now, to implement weight normalization, a basic approach mentioned in the reading is to divide the prob. scores by the length of the target sentence. 
+            # Now, to implement length normalization, a basic approach mentioned in the reading is to divide the prob. scores by the length of the target sentence. 
             # This way, the scores we compare are the average probability per word.
             if idx>=2:
                 # multiply by (idx - 1) before dividing because in the previous iteration it would have been divided by idx-1
@@ -228,7 +228,7 @@ class NMT(nn.Module):
             # (1) Now, this way, we can find the cumulative scores such that at each timestep, I have the max score possible till that timestep. I do this till min(max_decoding_time_step,</s>). 
             #       But how to keep track of the words at each timestep that are present in the beam_width?
 
-            # (2) Implementing Length Normalization -- Shouldn't this be implemented in the decoder?
+            # (2) Implementing Length Normalization -- Implemented basic method as of now
 
 
         # The hypotheses contain the decoded indices, the values contain the log probability scores obtained for those sentences (which will be the values of the last sentence)
