@@ -59,9 +59,9 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 import os
 import torch.cuda as cuda
-
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 
+device = torch.device("cuda" if args.cuda else "cpu")
 
 class NMT(nn.Module):
 
@@ -77,7 +77,7 @@ class NMT(nn.Module):
         self.bidirectional = False
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).cuda()
+        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
         self.attention = ConcatAttention(encoder_dim=self.hidden_size,decoder_dim=self.hidden_size)
 
         self.encoder = RNNEncoder(vocab=self.vocab.src,embed_size=self.embed_size,bidirectional=self.bidirectional,
@@ -124,7 +124,7 @@ class NMT(nn.Module):
         """
         source,lens = utils.convert_to_tensor(src_sents,self.vocab.src)
 #        print('input type', type(source))
-        source = source.cuda()
+        source = source.to(device)
         src_encodings,decoder_init_state = self.encoder(source,lens)
         return src_encodings, decoder_init_state
 
@@ -144,11 +144,11 @@ class NMT(nn.Module):
                 each example in the input batch
         """
         target, lens = utils.convert_to_tensor(tgt_sents,self.vocab.tgt)
-        target = target.cuda()
+        target = target.to(device)
         batch_size, max_len = target.size()
-        predictions = torch.zeros((batch_size,max_len,len(self.vocab.tgt))).cuda()
+        predictions = torch.zeros((batch_size,max_len,len(self.vocab.tgt))).to(device)
         hidden = decoder_init_state
-        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)]).cuda()
+        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)]).to(device)
         for idx in range(0, max_len):
             outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
             inputs = target[:, idx]
@@ -272,7 +272,7 @@ def train(args: Dict[str, str]):
     model = NMT(embed_size=int(args['--embed-size']),
                 hidden_size=int(args['--hidden-size']),
                 dropout_rate=float(args['--dropout']),
-                vocab=vocab).cuda()
+                vocab=vocab).to(device)
     print('model',type(model))
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0
