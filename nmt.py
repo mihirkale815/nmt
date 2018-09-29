@@ -60,8 +60,8 @@ from torch.optim.lr_scheduler import LambdaLR
 import os
 import torch.cuda as cuda
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
-
-device = torch.device("cuda" if args.cuda else "cpu")
+args = docopt(__doc__)
+device = torch.device("cuda" if args['--cuda'] else "cpu")
 
 class NMT(nn.Module):
 
@@ -431,7 +431,7 @@ def decode(args: Dict[str, str]):
 
 
 def main():
-    args = docopt(__doc__)
+    #args = docopt(__doc__)
 
     # seed the random number generator (RNG), you may
     # also want to seed the RNG of tensorflow, pytorch, dynet, etc.
