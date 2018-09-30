@@ -59,9 +59,9 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 import os
 import torch.cuda as cuda
-
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
-
+args = docopt(__doc__)
+device = torch.device("cuda" if args['--cuda'] else "cpu")
 
 class NMT(nn.Module):
 
@@ -77,7 +77,7 @@ class NMT(nn.Module):
         self.bidirectional = False
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).cuda()
+        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
         self.attention = ConcatAttention(encoder_dim=self.hidden_size,decoder_dim=self.hidden_size)
 
         self.encoder = RNNEncoder(vocab=self.vocab.src,embed_size=self.embed_size,bidirectional=self.bidirectional,
@@ -124,7 +124,7 @@ class NMT(nn.Module):
         """
         source,lens = utils.convert_to_tensor(src_sents,self.vocab.src)
 #        print('input type', type(source))
-        source = source.cuda()
+        source = source.to(device)
         src_encodings,decoder_init_state = self.encoder(source,lens)
         return src_encodings, decoder_init_state
 
@@ -144,11 +144,11 @@ class NMT(nn.Module):
                 each example in the input batch
         """
         target, lens = utils.convert_to_tensor(tgt_sents,self.vocab.tgt)
-        target = target.cuda()
+        target = target.to(device)
         batch_size, max_len = target.size()
-        predictions = torch.zeros((batch_size,max_len,len(self.vocab.tgt))).cuda()
+        predictions = torch.zeros((batch_size,max_len,len(self.vocab.tgt))).to(device)
         hidden = decoder_init_state
-        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)]).cuda()
+        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)]).to(device)
         for idx in range(0, max_len):
             outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
             inputs = target[:, idx]
@@ -164,11 +164,11 @@ class NMT(nn.Module):
 
     def beam_search_decode(self, src_encodings: Tensor, decoder_init_state, max_decoding_time_step, beam_width):
         
-        # predictions = torch.zeros((max_decoding_time_step, beam_width, len(self.vocab.tgt))).cuda()
+        predictions = torch.zeros((beam_width, max_decoding_time_step))
         
-        hypotheses = torch.zeros((beam_width, max_decoding_time_step)).cuda()
+        hypotheses = torch.zeros((beam_width, max_decoding_time_step))
         hidden = decoder_init_state
-        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>']]).cuda()
+        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(beam_width)])
 
         # values = torch.zeros((beam_width, 1))
         
@@ -177,6 +177,9 @@ class NMT(nn.Module):
             # we get the values and indices as (beam_width). Now the future comments from line 204 onwards apply.
 
         for idx in range(0, max_decoding_time_step):
+
+            print(inputs.shape, hidden[0].shape, hidden[1].shape)
+            s = input()
 
             outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
 
@@ -199,6 +202,7 @@ class NMT(nn.Module):
             if idx>=2:
                 # multiply by (idx - 1) before dividing because in the previous iteration it would have been divided by idx-1
                 outputs = (outputs*(idx-1))/idx
+
             values, indices = torch.topk(outputs, beam_width)
 
             # Values : Sorted Top-K probability distriubtions. Indices: their indices in tgt_vocab - this means that these indices are the word2id also.
@@ -209,16 +213,32 @@ class NMT(nn.Module):
             # Now for these new indices, (indices / beam_width) will give me which previous word it was from, and (indices % beam_width) will give me which word it currently is
             # (indices % beam_width) will give me the new inputs for the next timestep. 
 
-            inputs = (indices % beam_width).unsqueeze(1)
+            
+            # indices = indices[0]
+            print (indices)
+            values = values[0]
+
+            if idx!=0:
+                print(indices.shape)
+                inputs = (indices % beam_width).unsqueeze(1)
+                predictions[:,idx] = inputs.squeeze(1)
+                hypotheses[:,idx] = (indices/beam_width)
+                # hidden = hidden[hypotheses[:,idx]]
+                print(hidden.shape)
+            else:
+                inputs = indices
+                predictions[:,idx] = inputs
+                # hidden = (hidden[0].repeat(1,beam_width,1), hidden[1].repeat(1,beam_width,1))
 
             # inputs: (beam_width, 1)
             # Here, it is important that inputs is not just (beam_width), as that would mean it is a sequence with beam_width timesteps. 
             # We want the batch_size to be beam_width with each 1 input.
 
-            if [self.vocab.tgt.word2id['</s>']] in inputs:
-                hypotheses.append("<The indices recorded till now for this sentence>")
-                sentence_idx_to_stop_decoding = inputs.index([self.vocab.tgt.word2id['</s>']])
-                inputs = inputs[:sentence_idx_to_stop_decoding] + inputs[sentence_idx_to_stop_decoding+1:]
+            # if [self.vocab.tgt.word2id['</s>']] in inputs:
+            #     # hypotheses.append("<The indices recorded till now for this sentence>")
+            #     beam_width-=1
+            #     sentence_idx_to_stop_decoding = inputs.index([self.vocab.tgt.word2id['</s>']])
+            #     inputs = inputs[:sentence_idx_to_stop_decoding] + inputs[sentence_idx_to_stop_decoding+1:]
 
                 # Here inputs now becomes (beam_width-1, 1)
 
@@ -249,10 +269,8 @@ class NMT(nn.Module):
                 value: List[str]: the decoded target sentence, represented as a list of words
                 score: float: the log-likelihood of the target sentence
         """
-
-        #return hypothesis
-        src_encodings, decoder_init_state = self.encode(src_sent)
-        self.beam_search_decode(src_encodings, decoder_init_state, max_decoding_time_step, beam_size)
+        src_encodings, decoder_init_state = self.encode([src_sent]*beam_size)
+        scores = self.beam_search_decode(src_encodings, decoder_init_state, max_decoding_time_step, beam_size)
         return scores
         # raise NotImplementedError
 
@@ -295,13 +313,11 @@ class NMT(nn.Module):
         Returns:
             model: the loaded model
         """
-
-        print (model_path)
-        model = NMT
+        vocab = pickle.load(open("data/vocab.bin", 'rb'))
+        model = NMT(embed_size=int(args['--embed-size']),hidden_size=int(args['--hidden-size']),dropout_rate=float(args['--dropout']),vocab=vocab).to(device)
+        # model.load_state_dict(model_path)
         model.load_state_dict(torch.load(model_path))
-        # raise NotImplementedError()
         return model
-
         # raise NotImplementedError()
 
     def save(self, path: str):
@@ -353,7 +369,7 @@ def train(args: Dict[str, str]):
     model = NMT(embed_size=int(args['--embed-size']),
                 hidden_size=int(args['--hidden-size']),
                 dropout_rate=float(args['--dropout']),
-                vocab=vocab).cuda()
+                vocab=vocab).to(device)
     print('model',type(model))
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0
@@ -512,7 +528,7 @@ def decode(args: Dict[str, str]):
 
 
 def main():
-    args = docopt(__doc__)
+    #args = docopt(__doc__)
 
     # seed the random number generator (RNG), you may
     # also want to seed the RNG of tensorflow, pytorch, dynet, etc.
