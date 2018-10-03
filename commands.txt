@@ -1,8 +1,8 @@
 python nmt.py train \
-            --train-src='data/train.de-en.en.wmixerprep' \
-            --train-tgt='data/train.de-en.de.wmixerprep' \
-            --dev-src='data/valid.de-en.en.wmixerprep' \
-            --dev-tgt='data/valid.de-en.de.wmixerprep' \
+            --train-src='data/train.de-en.de.wmixerprep' \
+            --train-tgt='data/train.de-en.en.wmixerprep' \
+            --dev-src='data/valid.de-en.de.wmixerprep' \
+            --dev-tgt='data/valid.de-en.en.wmixerprep' \
             --vocab='data/vocab.bin' \
             --seed=0 \
             --batch-size=16 \

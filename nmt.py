@@ -52,7 +52,7 @@ from vocab import Vocab, VocabEntry
 import torch.nn as nn
 import torch
 from modules.encoders.rnn import RNNEncoder
-from modules.decoders.rnn import RNNDecoder,ConcatAttention
+from modules.decoders.rnn import RNNDecoder,ConcatAttention,BilinearAttention
 import utils
 from torch import Tensor
 import torch.optim as optim
@@ -64,6 +64,7 @@ from torch.autograd import Variable
 import pdb
 
 import beam as Beam_Class
+import torch.nn.functional as F
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 args = docopt(__doc__)
@@ -83,12 +84,15 @@ class NMT(nn.Module):
         self.bidirectional = True
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
-        self.attention = ConcatAttention(encoder_dim=self.attn_context_size,decoder_dim=self.hidden_size)
+        self.loss = nn.NLLLoss(reduction='sum',ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
+
+        #self.attention = ConcatAttention(encoder_dim=self.attn_context_size,decoder_dim=self.hidden_size)
+        self.attention = BilinearAttention(encoder_dim=self.attn_context_size, decoder_dim=self.hidden_size)
 
         self.encoder = RNNEncoder(vocab=self.vocab.src,embed_size=self.embed_size,bidirectional=self.bidirectional,
                                   hidden_size=self.hidden_size,n_layers=self.n_enc_layers,dropout=self.dropout_rate)
-        self.decoder = RNNDecoder(vocab=self.vocab.tgt,embed_size=self.embed_size,context_size=self.attn_context_size,
+
+        self.decoder = RNNDecoder(vocab=self.vocab.tgt,embed_size=self.embed_size,context_size=self.hidden_size,
                                   hidden_size=self.hidden_size,n_layers=self.n_dec_layers,attention=self.attention,
                                   dropout=0)
 
@@ -112,6 +116,8 @@ class NMT(nn.Module):
         return self.forward(src_sents,tgt_sents)
 
     def forward(self, src_sents: List[List[str]], tgt_sents: List[List[str]]) -> Tensor:
+        #for src_sent,tgt_sent in zip(src_sents,tgt_sents):
+            #print(src_sent,tgt_sent)
         src_encodings, decoder_init_state = self.encode(src_sents)
         scores = self.decode(src_encodings, decoder_init_state, tgt_sents)
         return scores
@@ -149,16 +155,26 @@ class NMT(nn.Module):
                 log-likelihood of generating the gold-standard target sentence for 
                 each example in the input batch
         """
-        target, lens = utils.convert_to_tensor(tgt_sents,self.vocab.tgt)
+        target, lens = utils.convert_to_tensor(tgt_sents,self.vocab.tgt.word2id)
+
+        #for i in range(len(lens)):
+        #    print(lens[i],tgt_sents[i],target[i])
+
         target = target.to(device)
         batch_size, max_len = target.size()
-        predictions = torch.zeros((batch_size,max_len,len(self.vocab.tgt))).to(device)
+        outputs_list = []
         hidden = decoder_init_state
-        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)]).to(device)
+
+        src_encodings = self.decoder.attention.linear(src_encodings)
+
         for idx in range(0, max_len):
-            outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
-            inputs = target[:, idx]
-            predictions[:, idx] = outputs
+            outputs, hidden, attn_scores = self.decoder(target[:, idx], hidden, src_encodings)
+            outputs_list.append(outputs)
+
+
+        outputs = torch.stack(outputs_list,dim=1)
+        logits = self.decoder.linear(outputs)
+        predictions = F.log_softmax(logits, dim=2)
         return target,predictions
 
     def criterion(self,targets,predictions):
@@ -185,9 +201,7 @@ class NMT(nn.Module):
         def unbottle(m):
             return m.view(beam_size, 1, -1)
 
-
-
-
+        src_encodings = self.decoder.attention.linear(src_encodings)
         src_encodings = rvar_src(src_encodings.data)
 
         # predictions = torch.zeros((beam_width, max_decoding_time_step))
@@ -215,7 +229,7 @@ class NMT(nn.Module):
             inp = var(torch.stack([b.getCurrentState() for b in beam]).t().contiguous().view(-1))
 
 
-            output, decState, attn = self.decoder(inp, decState, src_encodings)
+            output, decState, attn = self.decoder.predict(inp, decState, src_encodings)
 
             output = unbottle(output)
             attn = unbottle(attn)
@@ -272,7 +286,7 @@ class NMT(nn.Module):
         allScores.append(scores[0])
         allAttn.append(attn[0])
 
-        return allHyps, allAttn 
+        return allHyps, allScores ,allAttn
 
             # indices = indices[0]
             # print (indices)
@@ -319,13 +333,14 @@ class NMT(nn.Module):
         predictions = []
         hidden = decoder_init_state
         inputs = torch.LongTensor([bos]).to(device)
+        src_encodings = self.decoder.attention.linear(src_encodings)
         for idx in range(0, max_decoding_time_step):
             predicted_id = inputs.item()
             if predicted_id == eos: break
             predictions.append(predicted_id)
-            outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
+            outputs, hidden, attn_scores = self.decoder.predict(inputs, hidden, src_encodings)
             max_scores,inputs = torch.max(outputs,1) #only one instance
-        return predictions
+        return [predictions]
 
 
 
@@ -345,8 +360,11 @@ class NMT(nn.Module):
         """
         
         src_encodings, decoder_init_state = self.encode([src_sent])
-        scores = self.beam_search_decode(src_encodings, decoder_init_state, max_decoding_time_step, beam_size)
-        return scores
+        allHyps,allScores,allAttn = self.beam_search_decode(src_encodings, decoder_init_state,
+                                                            max_decoding_time_step, beam_size)
+
+        hyps = [Hypothesis(allHyps[i],allScores[i]) for i in range(len(allHyps))]
+        return hyps
         # raise NotImplementedError
 
     def greedy_search(self, src_sent: List[str], max_decoding_time_step: int = 70) -> List[
@@ -452,8 +470,13 @@ def train(args: Dict[str, str]):
     dev_data_src = read_corpus(args['--dev-src'], source='src')
     dev_data_tgt = read_corpus(args['--dev-tgt'], source='tgt')
 
+
     train_data = list(zip(train_data_src, train_data_tgt))
     dev_data = list(zip(dev_data_src, dev_data_tgt))
+
+    #num_samples = 1000
+    #train_data = train_data[0:num_samples]
+    #dev_data = dev_data[0:num_samples]
 
     train_batch_size = int(args['--batch-size'])
     clip_grad = float(args['--clip-grad'])
@@ -566,11 +589,11 @@ def train(args: Dict[str, str]):
                             exit(0)
 
                         # decay learning rate, and restore from previously best checkpoint
-                        lr = lr * float(args['--lr-decay'])
-                        print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
+                        #lr = lr * float(args['--lr-decay'])
+                        #print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
 
                         # load model
-                        model.load_state_dict(model_save_path)
+                        model.load_state_dict(torch.load(model_save_path))
 
                         print('restore parameters of the optimizers', file=sys.stderr)
                         # You may also need to load the state of the optimizer saved before
@@ -602,7 +625,6 @@ def greedy_search(model: NMT, test_data_src: List[List[str]], max_decoding_time_
     for src_sent in tqdm(test_data_src, desc='Decoding', file=sys.stdout):
         example_hyps = model.greedy_search(src_sent, max_decoding_time_step=max_decoding_time_step)
         hypotheses.append(example_hyps)
-        print(example_hyps)
     return hypotheses
 
 
@@ -616,18 +638,25 @@ def decode(args: Dict[str, str]):
     if args['TEST_TARGET_FILE']:
         test_data_tgt = read_corpus(args['TEST_TARGET_FILE'], source='tgt')
 
+    num_samples = 10
+    test_data_src = test_data_src[0:num_samples]
+    test_data_tgt = test_data_tgt[0:num_samples]
+
     print("load model from {args['MODEL_PATH']}", file=sys.stderr)
     model = NMT.load(args['MODEL_PATH'])
 
-    #hypotheses = beam_search(model, test_data_src,
-    #                         beam_size=int(args['--beam-size']),
-    #                         max_decoding_time_step=int(args['--max-decoding-time-step']))
 
-    hypotheses = greedy_search(model, test_data_src,
+
+    hypotheses = beam_search(model, test_data_src,
+                             beam_size=int(args['--beam-size']),
                              max_decoding_time_step=int(args['--max-decoding-time-step']))
 
+
+    #hypotheses = greedy_search(model, test_data_src,
+    #                         max_decoding_time_step=int(args['--max-decoding-time-step']))
+
     if args['TEST_TARGET_FILE']:
-        top_hypotheses = [hyps[0] for hyps in hypotheses]
+        top_hypotheses = [ hyps[0] for hyps in hypotheses]
         bleu_score = compute_corpus_level_bleu_score(test_data_tgt, top_hypotheses)
         print('Corpus BLEU: {bleu_score}', file=sys.stderr)
 
@@ -635,7 +664,7 @@ def decode(args: Dict[str, str]):
     with open(args['OUTPUT_FILE'], 'w') as f:
         for src_sent, hyps in zip(test_data_src, hypotheses):
             top_hyp = hyps[0]
-            top_hyp = [vocab.tgt.id2word[int(word[0].numpy())] for word in top_hyp]
+            top_hyp = [vocab.tgt.id2word[int(word[0].item())] for word in top_hyp]
             hyp_sent = ' '.join(top_hyp)
             f.write(hyp_sent + '\n')
 

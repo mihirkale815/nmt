@@ -50,6 +50,9 @@ def batch_iter(data, batch_size, shuffle=False):
         src_sents = [e[0] for e in examples]
         tgt_sents = [e[1] for e in examples]
 
+        #for src_sent,tgt_sent in zip(src_sents,tgt_sents):
+            #print(src_sent,tgt_sent)
+
         yield src_sents, tgt_sents
 
 

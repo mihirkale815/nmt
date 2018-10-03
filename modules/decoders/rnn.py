@@ -3,6 +3,19 @@ import torch
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn.functional as F
 
+class BilinearAttention(nn.Module):
+    def __init__(self,encoder_dim,decoder_dim):
+        super(BilinearAttention, self).__init__()
+        self.encoder_dim = encoder_dim
+        self.decoder_dim = decoder_dim
+        self.linear = nn.Linear(self.encoder_dim,self.decoder_dim)
+
+    def forward(self, hidden,encoder_outputs):
+        hidden = hidden.permute(0,2,1) #B,1,D => B,D,1
+        scores = torch.bmm(encoder_outputs,hidden).squeeze(2)
+        scores = F.softmax(scores,dim=1)
+        return scores
+
 class ConcatAttention(nn.Module):
     def __init__(self,encoder_dim,decoder_dim):
         super(ConcatAttention, self).__init__()
@@ -48,8 +61,13 @@ class RNNDecoder(nn.Module):
         attn_scores = self.attention(hidden[0].permute(1, 0, 2), encoder_inputs).unsqueeze(1)  # bs x 1 x maxlen
         context = attn_scores.bmm(encoder_inputs).squeeze(1)
         output = torch.cat([output.squeeze(1),context],dim=1)
-        output = F.log_softmax(self.linear(output),dim=1)
         return output,hidden,attn_scores.squeeze(1)
+
+    def predict(self,input,hidden,encoder_inputs):
+        output, hidden, attn_scores = self.forward(input,hidden,encoder_inputs)
+        output =  self.linear(output)
+        return output, hidden, attn_scores
+
 
 
 class RNNBahdanauDecoder(nn.Module):

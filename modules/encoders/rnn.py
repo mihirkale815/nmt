@@ -26,8 +26,8 @@ class RNNEncoder(nn.Module):
         packed_output, hidden = self.rnn(packed_input)
         output,_ = pad_packed_sequence(packed_output, batch_first=True)
         if self.bidirectional :
-            h = torch.cat([h for h in hidden[0]],dim=1)
-            h = self.tanh(self.projection(h)).unsqueeze(0)
-            c = hidden[1][0].unsqueeze(0)
-            hidden = (h,c)
+            c = torch.cat([c for c in hidden[1]],dim=1)
+            c = self.tanh(self.projection(c)).unsqueeze(0)
+            h = hidden[0][0].unsqueeze(0)
+            hidden = (c,h)
         return output,hidden
