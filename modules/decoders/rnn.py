@@ -3,24 +3,45 @@ import torch
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 import torch.nn.functional as F
 
+
 class ConcatAttention(nn.Module):
-    def __init__(self,encoder_dim,decoder_dim):
+    def __init__(self, encoder_dim, decoder_dim):
         super(ConcatAttention, self).__init__()
         self.encoder_dim = encoder_dim
         self.decoder_dim = decoder_dim
-        self.linear = nn.Linear(self.encoder_dim+self.decoder_dim,self.decoder_dim)
-        self.W = nn.Linear(self.decoder_dim,1)
+        self.linear = nn.Linear(self.encoder_dim + self.decoder_dim, self.decoder_dim)
+        self.W = nn.Linear(self.decoder_dim, 1)
         self.relu = nn.ReLU()
 
-    def forward(self, hidden,encoder_outputs):
-        batchsize,maxlen,encoderdim = encoder_outputs.size()
-        #hidden = hidden.unsqueeze(1) #B,D => B,1,D
-        hidden = hidden.expand(-1,maxlen,-1) #B,1,D => B,L,D
-        input = torch.cat([encoder_outputs,hidden],dim=2)
+    def forward(self, hidden, encoder_outputs):
+        batchsize, maxlen, encoderdim = encoder_outputs.size()
+        hidden = hidden.permute(0, 2, 1)  # B,D => B,1,D
+        hidden = hidden.expand(-1, maxlen, -1)  # B,1,D => B,L,D
+        input = torch.cat([encoder_outputs, hidden], dim=2)
         energy = self.relu(self.linear(input))
-        scores = self.W(energy).squeeze(-1) #bs x maxlen
-        scores = F.softmax(scores,dim=1)
+        scores = self.W(energy).squeeze(-1)  # bs x maxlen
+        scores = F.softmax(scores, dim=1)
         return scores
+
+
+class LuongAttention(nn.Module):
+    def __init__(self, encoder_dim, decoder_dim):
+        super(LuongAttention, self).__init__()
+        self.encoder_dim = encoder_dim
+        self.decoder_dim = decoder_dim
+        self.linear_in = nn.Linear(self.decoder_dim, self.encoder_dim)
+        self.linear_out = nn.Linear(self.decoder_dim, 1)
+        self.relu = nn.ReLU()
+
+    def forward(self, hidden, encoder_outputs):
+        hidden = hidden.squeeze(2)
+        hidden = self.linear_in(hidden)
+        hidden = hidden.unsqueeze(2)
+        scores = torch.bmm(encoder_outputs, hidden).squeeze(2)
+        scores = F.softmax(scores, dim=1)
+        return scores
+
+
 
 
 class RNNDecoder(nn.Module):
@@ -44,10 +65,11 @@ class RNNDecoder(nn.Module):
         embedding = self.embed(input)
         input = embedding
         output,hidden = self.rnn(input.unsqueeze(1),hidden)
-        attn_scores = self.attention(hidden[0].permute(1, 0, 2), encoder_inputs).unsqueeze(1)  # bs x 1 x maxlen
+        attn_scores = self.attention(hidden[0].permute(1, 2, 0), encoder_inputs).unsqueeze(1)  # bs x 1 x maxlen
         context = attn_scores.bmm(encoder_inputs).squeeze(1)
         output = torch.cat([output.squeeze(1),context],dim=1)
-        output = F.log_softmax(self.linear(output),dim=1)
+        #output = F.log_softmax(self.linear(output),dim=1)
+        output = self.linear(output)
         return output,hidden,attn_scores.squeeze(1)
 
 
@@ -70,12 +92,13 @@ class RNNBahdanauDecoder(nn.Module):
 
     def forward(self,input,hidden,encoder_inputs):
         embedding = self.embed(input)
-        attn_scores = self.attention(hidden[0].permute(1,0,2), encoder_inputs).unsqueeze(1)  # bs x 1 x maxlen
+        attn_scores = self.attention(hidden[0].permute(1,2,0), encoder_inputs).unsqueeze(1)  # bs x 1 x maxlen
         context = attn_scores.bmm(encoder_inputs).squeeze(1)
         input = torch.cat([embedding,context],dim=1)
         output,hidden = self.rnn(input.unsqueeze(1),hidden)
         output = torch.cat([output.squeeze(1),context],dim=1)
-        output = F.log_softmax(self.linear(output),dim=1)
+        #output = F.log_softmax(self.linear(output),dim=1)
+        output = self.linear(output)
         return output,hidden,attn_scores.squeeze(1)
 
 

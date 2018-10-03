@@ -77,7 +77,8 @@ class NMT(nn.Module):
         self.bidirectional = False
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
+        self.loss = nn.CrossEntropyLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
+        self.bow_loss = nn.BCEWithLogitsLoss()
         self.attention = ConcatAttention(encoder_dim=self.hidden_size,decoder_dim=self.hidden_size)
 
         self.encoder = RNNEncoder(vocab=self.vocab.src,embed_size=self.embed_size,bidirectional=self.bidirectional,
@@ -151,8 +152,8 @@ class NMT(nn.Module):
         inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(batch_size)]).to(device)
         for idx in range(0, max_len):
             outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
-            inputs = target[:, idx]
             predictions[:, idx] = outputs
+            inputs = target[:, idx]
         return target,predictions
 
     def criterion(self,targets,predictions):
@@ -273,7 +274,7 @@ def train(args: Dict[str, str]):
                 hidden_size=int(args['--hidden-size']),
                 dropout_rate=float(args['--dropout']),
                 vocab=vocab).to(device)
-    print('model',type(model))
+    print('model',model)
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0
     cumulative_examples = report_examples = epoch = valid_num = 0
