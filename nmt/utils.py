@@ -56,7 +56,6 @@ def batch_iter(data, batch_size, shuffle=False):
 def convert_to_tensor(sents,word2id):
     lens = np.array([len(sent) for sent in sents])
     sorted_indices = np.argsort(-lens)
-
     sents = [ torch.LongTensor([word2id[word] for word in sent]) for sent in sents]
     sents = torch.nn.utils.rnn.pad_sequence(sents,batch_first=True,padding_value=word2id['<pad>'])
 

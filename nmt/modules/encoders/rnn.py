@@ -14,7 +14,7 @@ class RNNEncoder(nn.Module):
         self.bidirectional = bidirectional
         self.embed = nn.Embedding(len(self.vocab),embed_size)
         self.rnn = nn.LSTM(input_size=self.embed_size,hidden_size=self.hidden_size,bidirectional=self.bidirectional,
-                               num_layers=self.n_layers)
+                               num_layers=self.n_layers, batch_first=True)
         self.embed_dropout = nn.Dropout(p=self.dropout)
 
 

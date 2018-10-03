@@ -31,29 +31,29 @@ echo save results to ${work_dir}
 #     --clip-grad 5.0 \
 #     --lr-decay 0.5 2>${work_dir}/err.log
 
-# python nmt.py train \
-#             --train-src='data/train.de-en.en.wmixerprep' \
-#             --train-tgt='data/train.de-en.de.wmixerprep' \
-#             --dev-src='data/valid.de-en.en.wmixerprep' \
-#             --dev-tgt='data/valid.de-en.de.wmixerprep' \
-#             --vocab='data/vocab.bin' \
-#             --seed=0 \
-#             --batch-size=16 \
-#             --embed-size=128 \
-#             --hidden-size=128 \
-#             --valid-niter=50 \
-#             --clip-grad=5 \
-#             --log-every=10 \
-#             --max-epoch=30 \
-#             --patience=5 \
-#             --max-num-trial=5 \
-#             --lr-decay=0.5 \
-#             --beam-size=5 \
-#             --lr=0.001 \
-#             --uniform-init=0.1 \
-#             --save-to=experiments \
-#             --dropout=0.2 \
-#             --max-decoding-time-step=70
+python nmt.py train \
+            --train-src='data/train.de-en.en.wmixerprep' \
+            --train-tgt='data/train.de-en.de.wmixerprep' \
+            --dev-src='data/valid.de-en.en.wmixerprep' \
+            --dev-tgt='data/valid.de-en.de.wmixerprep' \
+            --vocab='data/vocab.bin' \
+            --seed=0 \
+            --batch-size=16 \
+            --embed-size=128 \
+            --hidden-size=128 \
+            --valid-niter=50 \
+            --clip-grad=5 \
+            --log-every=10 \
+            --max-epoch=30 \
+            --patience=5 \
+            --max-num-trial=5 \
+            --lr-decay=0.5 \
+            --beam-size=5 \
+            --lr=0.001 \
+            --uniform-init=0.1 \
+            --save-to=experiments \
+            --dropout=0.2 \
+            --max-decoding-time-step=70
 
 python nmt.py \
     decode \

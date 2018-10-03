@@ -1,4 +1,4 @@
-# coding=utf-8
+    # coding=utf-8
 
 """
 A very basic implementation of neural machine translation
@@ -59,6 +59,12 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 import os
 import torch.cuda as cuda
+from beam import Beam
+from torch.autograd import Variable
+import pdb
+
+import beam as Beam_Class
+
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 args = docopt(__doc__)
 device = torch.device("cuda" if args['--cuda'] else "cpu")
@@ -162,13 +168,38 @@ class NMT(nn.Module):
         loss = self.loss(predictions, targets)
         return loss
 
-    def beam_search_decode(self, src_encodings: Tensor, decoder_init_state, max_decoding_time_step, beam_width):
+    def beam_search_decode(self, src_encodings: Tensor, decoder_init_state, max_decoding_time_step, beam_size):
         
-        predictions = torch.zeros((beam_width, max_decoding_time_step))
+        def var(a):
+            return Variable(a, volatile=True)
+
+        def rvar_src(a):
+            return var(a.repeat(beam_size,1, 1))
+
+        def rvar_hidden(a):
+            return var(a.repeat(1, beam_size, 1))
+
+        def bottle(m):
+            return m.view(1 * beam_size, -1)
+
+        def unbottle(m):
+            return m.view(beam_size, 1, -1)
+
+
+
+
+        src_encodings = rvar_src(src_encodings.data)
+
+        # predictions = torch.zeros((beam_width, max_decoding_time_step))
         
-        hypotheses = torch.zeros((beam_width, max_decoding_time_step))
-        hidden = decoder_init_state
-        inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(beam_width)])
+        # hypotheses = torch.zeros((beam_width, max_decoding_time_step))
+        # hidden = decoder_init_state
+        # inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(beam_width)])
+
+        decState = (rvar_hidden(decoder_init_state[0].data), rvar_hidden(decoder_init_state[1].data))
+        # memory = decState[0][-1]
+
+        beam = [Beam_Class.Beam(beam_size, n_best=1)]
 
         # values = torch.zeros((beam_width, 1))
         
@@ -178,16 +209,29 @@ class NMT(nn.Module):
 
         for idx in range(0, max_decoding_time_step):
 
-            print(inputs.shape, hidden[0].shape, hidden[1].shape)
-            s = input()
+            if all((b.done() for b in beam)):
+                break
 
-            outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
+            inp = var(torch.stack([b.getCurrentState() for b in beam]).t().contiguous().view(-1))
+
+
+            output, decState, attn = self.decoder(inp, decState, src_encodings)
+
+            output = unbottle(output)
+            attn = unbottle(attn)
+
+            for j, b in enumerate(beam):
+                b.advance(output.data[:, j], attn.data[:, j])
+                b.beam_update(decState, j)
+                # b.beam_update_memory(memory, j)
+
+            # outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
 
             # outputs now is: (beam_width, 1, tgt_vocab). '1' in dim. 1 because we send 1 word at a time and we get the prob. dist over the vocab for the next word
 
-            if idx!=0:
-                outputs = outputs.squeeze(1)
-                values = values.unsqueeze(1)
+            # if idx!=0:
+            #     outputs = outputs.squeeze(1)
+            #     values = values.unsqueeze(1)
 
             # outputs now is: (beam_width, tgt_vocab)
             # previous values is: (beam_width, 1)
@@ -195,15 +239,15 @@ class NMT(nn.Module):
             # Outputs + previous values broadcasted : (beam_width, tgt_vocab) [But now this also contains the log prob score of previous state it came from]
             # Now if I flattened the above summation, i will get (beam_width*tgt_vocab). Doing top-k on this will give me beam_width indices.
             
-                outputs = (outputs+values).view(-1)
+                # outputs = (outputs+values).view(-1)
 
             # Now, to implement length normalization, a basic approach mentioned in the reading is to divide the prob. scores by the length of the target sentence. 
             # This way, the scores we compare are the average probability per word.
-            if idx>=2:
+            # if idx>=2:
                 # multiply by (idx - 1) before dividing because in the previous iteration it would have been divided by idx-1
-                outputs = (outputs*(idx-1))/idx
+                # outputs = (outputs*(idx-1))/idx
 
-            values, indices = torch.topk(outputs, beam_width)
+            # values, indices = torch.topk(outputs, beam_width)
 
             # Values : Sorted Top-K probability distriubtions. Indices: their indices in tgt_vocab - this means that these indices are the word2id also.
             # Hence, the indices itself will be the input to the next timestep
@@ -213,21 +257,37 @@ class NMT(nn.Module):
             # Now for these new indices, (indices / beam_width) will give me which previous word it was from, and (indices % beam_width) will give me which word it currently is
             # (indices % beam_width) will give me the new inputs for the next timestep. 
 
-            
-            # indices = indices[0]
-            print (indices)
-            values = values[0]
+        
+        allHyps, allScores, allAttn = [], [], []
 
-            if idx!=0:
-                print(indices.shape)
-                inputs = (indices % beam_width).unsqueeze(1)
-                predictions[:,idx] = inputs.squeeze(1)
-                hypotheses[:,idx] = (indices/beam_width)
-                # hidden = hidden[hypotheses[:,idx]]
-                print(hidden.shape)
-            else:
-                inputs = indices
-                predictions[:,idx] = inputs
+        b = beam[0]
+        n_best = 1
+        scores, ks = b.sortFinished(minimum=n_best)
+        hyps, attn = [], []
+        for i, (times, k) in enumerate(ks[:n_best]):
+            hyp, att = b.getHyp(times, k)
+            hyps.append(hyp)
+            attn.append(att.max(1)[1])
+        allHyps.append(hyps[0])
+        allScores.append(scores[0])
+        allAttn.append(attn[0])
+
+        return allHyps, allAttn 
+
+            # indices = indices[0]
+            # print (indices)
+            # values = values[0]
+
+            # if idx!=0:
+            #     print(indices.shape)
+            #     inputs = (indices % beam_width).unsqueeze(1)
+            #     predictions[:,idx] = inputs.squeeze(1)
+            #     hypotheses[:,idx] = (indices/beam_width)
+            #     # hidden = hidden[hypotheses[:,idx]]
+            #     print(hidden.shape)
+            # else:
+            #     inputs = indices
+            #     predictions[:,idx] = inputs
                 # hidden = (hidden[0].repeat(1,beam_width,1), hidden[1].repeat(1,beam_width,1))
 
             # inputs: (beam_width, 1)
@@ -252,7 +312,7 @@ class NMT(nn.Module):
 
 
         # The hypotheses contain the decoded indices, the values contain the log probability scores obtained for those sentences (which will be the values of the last sentence)
-        return hypotheses, values
+        # return hypotheses, values
 
 
     def beam_search(self, src_sent: List[str], beam_size: int=5, max_decoding_time_step: int=70) -> List[Hypothesis]:
@@ -269,7 +329,8 @@ class NMT(nn.Module):
                 value: List[str]: the decoded target sentence, represented as a list of words
                 score: float: the log-likelihood of the target sentence
         """
-        src_encodings, decoder_init_state = self.encode([src_sent]*beam_size)
+        
+        src_encodings, decoder_init_state = self.encode([src_sent])
         scores = self.beam_search_decode(src_encodings, decoder_init_state, max_decoding_time_step, beam_size)
         return scores
         # raise NotImplementedError
@@ -295,6 +356,7 @@ class NMT(nn.Module):
 
 
         for src_sents, tgt_sents in batch_iter(dev_data, batch_size):
+
             target,predictions  = self.forward(src_sents, tgt_sents)
             loss = self.criterion(target,predictions)
             cum_loss += loss.item()
@@ -520,10 +582,12 @@ def decode(args: Dict[str, str]):
         bleu_score = compute_corpus_level_bleu_score(test_data_tgt, top_hypotheses)
         print(f'Corpus BLEU: {bleu_score}', file=sys.stderr)
 
+    vocab = pickle.load(open('data/vocab.bin', 'rb'))
     with open(args['OUTPUT_FILE'], 'w') as f:
         for src_sent, hyps in zip(test_data_src, hypotheses):
             top_hyp = hyps[0]
-            hyp_sent = ' '.join(top_hyp.value)
+            top_hyp = [vocab.tgt.id2word[int(word[0].numpy())] for word in top_hyp]
+            hyp_sent = ' '.join(top_hyp)
             f.write(hyp_sent + '\n')
 
 
