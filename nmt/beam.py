@@ -24,7 +24,6 @@ class Beam(object):
         self.nextYs = [self.tt.LongTensor(size)
                        .fill_(nmt_utils.EOS)]
         self.nextYs[0][0] = nmt_utils.BOS
-
         # Has EOS topped the beam yet.
         self._eos = nmt_utils.EOS
         self.eosTop = False
@@ -62,7 +61,6 @@ class Beam(object):
         # Sum the previous scores.
         if len(self.prevKs) > 0:
             beamLk = wordLk + self.scores.unsqueeze(1).expand_as(wordLk)
-
             # Don't let EOS have children.
             for i in range(self.nextYs[-1].size(0)):
                 if self.nextYs[-1][i] == self._eos:
@@ -71,7 +69,6 @@ class Beam(object):
             beamLk = wordLk[0]
         flatBeamLk = beamLk.view(-1)
         bestScores, bestScoresId = flatBeamLk.topk(self.size, 0, True, True)
-
         self.allScores.append(self.scores)
         self.scores = bestScores
 

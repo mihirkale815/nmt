@@ -9,6 +9,7 @@ Usage:
     nmt.py decode [options] MODEL_PATH TEST_SOURCE_FILE TEST_TARGET_FILE OUTPUT_FILE
 
 Options:
+    --optim				    adam or sgd
     -h --help                               show this screen.
     --cuda                                  use GPU
     --train-src=<file>                      train source file
@@ -80,11 +81,11 @@ class NMT(nn.Module):
         self.vocab = vocab
         self.n_enc_layers = 1
         self.n_dec_layers = 1
-        self.bidirectional = False
+        self.bidirectional = True
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-        self.loss = nn.NLLLoss(ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
-        self.attention = ConcatAttention(encoder_dim=self.hidden_size,decoder_dim=self.hidden_size)
+        self.loss = nn.NLLLoss(reduction='sum',ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
+        self.attention = ConcatAttention(encoder_dim=self.attn_context_size,decoder_dim=self.hidden_size)
 
         self.encoder = RNNEncoder(vocab=self.vocab.src,embed_size=self.embed_size,bidirectional=self.bidirectional,
                                   hidden_size=self.hidden_size,n_layers=self.n_enc_layers,dropout=self.dropout_rate)
@@ -206,14 +207,12 @@ class NMT(nn.Module):
         # All the comments below inside the loop are for timesteps 1 to max_decoding_time_step. For timestep 0, the following calculations hold:
             # inputs is just ['<s>']. outputs is: (tgt_vocab_size), [no 'values' tensor gets added to outputs at idx 0 as the if condition checks that]
             # we get the values and indices as (beam_width). Now the future comments from line 204 onwards apply.
-
         for idx in range(0, max_decoding_time_step):
 
             if all((b.done() for b in beam)):
                 break
 
             inp = var(torch.stack([b.getCurrentState() for b in beam]).t().contiguous().view(-1))
-
 
             output, decState, attn = self.decoder(inp, decState, src_encodings)
 
@@ -331,7 +330,8 @@ class NMT(nn.Module):
         """
         
         src_encodings, decoder_init_state = self.encode([src_sent])
-        scores = self.beam_search_decode(src_encodings, decoder_init_state, max_decoding_time_step, beam_size)
+        scores = self.beam_search_decode(src_encodings, decoder_init_state, max_decoding_time_step, beam_size) 
+        print([self.vocab.tgt.id2word[int(word[0].numpy())] for word in scores[0][0]]) 
         return scores
         # raise NotImplementedError
 
@@ -440,8 +440,9 @@ def train(args: Dict[str, str]):
     train_time = begin_time = time.time()
     print('Starting Maximum Likelihood training')
 
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=float(args['--lr']))
-
+    optim_type = 'adam' #args['--optim']
+    if optim_type == 'adam' : optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=float(args['--lr']))
+    #elif optim_type == 'sgd' : optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=float(args['--lr']))
     while True:
         epoch += 1
 
@@ -548,15 +549,17 @@ def train(args: Dict[str, str]):
                     exit(0)
 
 
-def beam_search(model: NMT, test_data_src: List[List[str]], beam_size: int, max_decoding_time_step: int) -> List[List[Hypothesis]]:
+def beam_search(model: NMT, test_data_src: List[List[str]], test_data_tgt: List[List[str]],beam_size: int, max_decoding_time_step: int) -> List[List[Hypothesis]]:
     was_training = model.training
 
     hypotheses = []
+    counter = 0
     for src_sent in tqdm(test_data_src, desc='Decoding', file=sys.stdout):
+        tgt_sent = test_data_tgt[counter]
         example_hyps = model.beam_search(src_sent, beam_size=beam_size, max_decoding_time_step=max_decoding_time_step)
-
+        print(len(src_sent),len(tgt_sent),len(example_hyps[0][0]))
         hypotheses.append(example_hyps)
-
+        counter+=1
     return hypotheses
 
 
@@ -570,17 +573,17 @@ def decode(args: Dict[str, str]):
     if args['TEST_TARGET_FILE']:
         test_data_tgt = read_corpus(args['TEST_TARGET_FILE'], source='tgt')
 
-    print(f"load model from {args['MODEL_PATH']}", file=sys.stderr)
+    print("load model from {args['MODEL_PATH']}", file=sys.stderr)
     model = NMT.load(args['MODEL_PATH'])
 
-    hypotheses = beam_search(model, test_data_src,
+    hypotheses = beam_search(model, test_data_src,test_data_tgt,
                              beam_size=int(args['--beam-size']),
                              max_decoding_time_step=int(args['--max-decoding-time-step']))
 
     if args['TEST_TARGET_FILE']:
         top_hypotheses = [hyps[0] for hyps in hypotheses]
         bleu_score = compute_corpus_level_bleu_score(test_data_tgt, top_hypotheses)
-        print(f'Corpus BLEU: {bleu_score}', file=sys.stderr)
+        print('Corpus BLEU: {bleu_score}', file=sys.stderr)
 
     vocab = pickle.load(open('data/vocab.bin', 'rb'))
     with open(args['OUTPUT_FILE'], 'w') as f:
@@ -604,7 +607,7 @@ def main():
     elif args['decode']:
         decode(args)
     else:
-        raise RuntimeError(f'invalid mode')
+        raise RuntimeError('invalid mode')
 
 
 if __name__ == '__main__':
