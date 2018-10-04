@@ -278,7 +278,7 @@ class NMT(nn.Module):
         hyps, attn = [], []
         for i, (times, k) in enumerate(ks[:n_best]):
             hyp, att = b.getHyp(times, k)
-            hyps.append(hyp)
+            hyps.append([k.item() for k in hyp])
             attn.append(att.max(1)[1])
         allHyps.append(hyps[0])
         allScores.append(scores[0])
@@ -356,8 +356,10 @@ class NMT(nn.Module):
                 value: List[str]: the decoded target sentence, represented as a list of words
                 score: float: the log-likelihood of the target sentence
         """
-        
-        src_encodings, decoder_init_state = self.encode([src_sent])
+        src_sent, src_len = \
+            utils.convert_to_tensor_single(src_sent, self.vocab.src)
+
+        src_encodings, decoder_init_state = self.encode([src_sent], [src_len])
         allHyps,allScores,allAttn = self.beam_search_decode(src_encodings, decoder_init_state,
                                                             max_decoding_time_step, beam_size)
 
@@ -380,9 +382,12 @@ class NMT(nn.Module):
                 value: List[str]: the decoded target sentence, represented as a list of words
                 score: float: the log-likelihood of the target sentence
         """
+        src_sent, src_len = \
+            utils.convert_to_tensor_single(src_sent, self.vocab.src)
 
-        src_encodings, decoder_init_state = self.encode([src_sent])
+        src_encodings, decoder_init_state = self.encode([src_sent],[src_len])
         hyps = self.greedy_search_decode(src_encodings, decoder_init_state, max_decoding_time_step)
+        hyps = [Hypothesis(hyps[0],1)]
         return hyps
 
 
@@ -656,13 +661,13 @@ def decode(args: Dict[str, str]):
     if args['TEST_TARGET_FILE']:
         top_hypotheses = [ hyps[0] for hyps in hypotheses]
         bleu_score = compute_corpus_level_bleu_score(test_data_tgt, top_hypotheses)
-        print('Corpus BLEU: {bleu_score}', file=sys.stderr)
+        print('Corpus BLEU:',bleu_score, file=sys.stderr)
 
     vocab = pickle.load(open('data/vocab.bin', 'rb'))
     with open(args['OUTPUT_FILE'], 'w') as f:
         for src_sent, hyps in zip(test_data_src, hypotheses):
-            top_hyp = hyps[0]
-            top_hyp = [vocab.tgt.id2word[int(word[0].item())] for word in top_hyp]
+            top_hyp = hyps[0].value
+            top_hyp = [vocab.tgt.id2word[int(word)] for word in top_hyp]
             hyp_sent = ' '.join(top_hyp)
             f.write(hyp_sent + '\n')
 

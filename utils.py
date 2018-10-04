@@ -78,3 +78,8 @@ def convert_to_tensor(src_sents,src_vocab,tgt_sents,tgt_vocab):
     tgt_sents,tgt_tensor, tgt_lens = F(tgt_sents,tgt_vocab,sorted_indices)
 
     return src_tensor,src_lens,tgt_tensor,tgt_lens
+
+
+def convert_to_tensor_single(sent,vocab):
+    sent = torch.LongTensor([vocab[word] for word in sent])
+    return sent,len(sent)
