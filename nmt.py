@@ -166,19 +166,20 @@ class NMT(nn.Module):
 
         src_encodings = self.decoder.attention.linear(src_encodings)
 
-        for idx in range(0, max_len):
+        for idx in range(0, max_len-1):
             outputs, hidden, attn_scores = self.decoder(target[:, idx], hidden, src_encodings)
             outputs_list.append(outputs)
 
 
         outputs = torch.stack(outputs_list,dim=1)
         logits = self.decoder.linear(outputs)
+        target = target[:,1:]
         return target,logits
 
     def criterion(self,targets,predictions):
         batch_size, max_len, vocab_size = predictions.size()
-        predictions = predictions.view(batch_size * max_len, vocab_size)
-        targets = targets.view(batch_size * max_len)
+        predictions = predictions.contiguous().view(batch_size * max_len, vocab_size)
+        targets = targets.contiguous().view(batch_size * max_len)
         loss = self.loss(predictions, targets)
         return loss
 
@@ -359,7 +360,7 @@ class NMT(nn.Module):
         src_sent, src_len = \
             utils.convert_to_tensor_single(src_sent, self.vocab.src)
 
-        src_encodings, decoder_init_state = self.encode([src_sent], [src_len])
+        src_encodings, decoder_init_state = self.encode(src_sent, [src_len])
         allHyps,allScores,allAttn = self.beam_search_decode(src_encodings, decoder_init_state,
                                                             max_decoding_time_step, beam_size)
 
@@ -385,7 +386,7 @@ class NMT(nn.Module):
         src_sent, src_len = \
             utils.convert_to_tensor_single(src_sent, self.vocab.src)
 
-        src_encodings, decoder_init_state = self.encode([src_sent],[src_len])
+        src_encodings, decoder_init_state = self.encode(src_sent,[src_len])
         hyps = self.greedy_search_decode(src_encodings, decoder_init_state, max_decoding_time_step)
         hyps = [Hypothesis(hyps[0],1)]
         return hyps
@@ -501,8 +502,10 @@ def train(args: Dict[str, str]):
     train_time = begin_time = time.time()
     print('Starting Maximum Likelihood training')
 
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=float(args['--lr']))
-
+    lr = float(args['--lr'])
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.5, last_epoch=-1)
+    
     while True:
         epoch += 1
 
@@ -517,6 +520,10 @@ def train(args: Dict[str, str]):
             # (batch_size)
             targets,predictions = model(src_sents, tgt_sents)
             loss = model.criterion(targets,predictions)
+
+            #if train_iter >= 1000 :
+            #    for i in range(50):
+            #        print(src_sents[i],tgt_sents[i],torch.argmax(predictions, dim=2)[i], targets[i], "\n\n")
 
             report_loss += loss.item()
             cum_loss += loss.item()
@@ -592,13 +599,17 @@ def train(args: Dict[str, str]):
                             exit(0)
 
                         # decay learning rate, and restore from previously best checkpoint
-                        #lr = lr * float(args['--lr-decay'])
-                        #print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
+                        scheduler.step()
+                        print("Modified learning rate...")
+                        print('loading previously best model and decaying learning rate', file=sys.stderr)
+                        for param_group in optimizer.param_groups:
+                            print("lr for param group =",param_group['lr'])
+
 
                         # load model
                         model.load_state_dict(torch.load(model_save_path))
 
-                        print('restore parameters of the optimizers', file=sys.stderr)
+                        #print('restore parameters of the optimizers', file=sys.stderr)
                         # You may also need to load the state of the optimizer saved before
 
                         # reset patience
@@ -641,7 +652,7 @@ def decode(args: Dict[str, str]):
     if args['TEST_TARGET_FILE']:
         test_data_tgt = read_corpus(args['TEST_TARGET_FILE'], source='tgt')
 
-    num_samples = 10
+    num_samples = len(test_data_src) #10
     test_data_src = test_data_src[0:num_samples]
     test_data_tgt = test_data_tgt[0:num_samples]
 
