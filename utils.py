@@ -41,14 +41,18 @@ def batch_iter(data, batch_size, shuffle=False):
 
     if shuffle:
         np.random.shuffle(index_array)
+    data = sorted(data,key = lambda x : len(x[1]) )
+    datalen = len(data)
 
     for i in range(batch_num):
-        indices = index_array[i * batch_size: (i + 1) * batch_size]
+        #indices = index_array[i * batch_size: (i + 1) * batch_size]
+        indices = [idx for idx in range(i * batch_size,min(datalen,(i + 1) * batch_size))]
         examples = [data[idx] for idx in indices]
 
         examples = sorted(examples, key=lambda e: len(e[0]), reverse=True)
         src_sents = [e[0] for e in examples]
         tgt_sents = [e[1] for e in examples]
+
 
         #for src_sent,tgt_sent in zip(src_sents,tgt_sents):
             #print(src_sent,tgt_sent)
@@ -56,13 +60,21 @@ def batch_iter(data, batch_size, shuffle=False):
         yield src_sents, tgt_sents
 
 
-def convert_to_tensor(sents,word2id):
-    lens = np.array([len(sent) for sent in sents])
+def convert_to_tensor(src_sents,src_vocab,tgt_sents,tgt_vocab):
+
+    lens = np.array([len(sent) for sent in src_sents])
     sorted_indices = np.argsort(-lens)
-    sents = [ torch.LongTensor([word2id[word] for word in sent]) for sent in sents]
-    sents = torch.nn.utils.rnn.pad_sequence(sents,batch_first=True,padding_value=word2id['<pad>'])
 
-    lens = lens[sorted_indices]
-    sents = sents[sorted_indices]
+    def F(sents,vocab,indices):
+        raw = [sents[i] for i in indices]
+        lens = np.array([len(sent) for sent in sents])
+        sents = [ torch.LongTensor([vocab[word] for word in sent]) for sent in sents]
+        sents = torch.nn.utils.rnn.pad_sequence(sents,batch_first=True,padding_value=vocab['<pad>'])
+        lens = lens[indices]
+        sents = sents[indices]
+        return raw,sents,lens
 
-    return sents,lens
+    src_sents,src_tensor, src_lens = F(src_sents,src_vocab,sorted_indices)
+    tgt_sents,tgt_tensor, tgt_lens = F(tgt_sents,tgt_vocab,sorted_indices)
+
+    return src_tensor,src_lens,tgt_tensor,tgt_lens

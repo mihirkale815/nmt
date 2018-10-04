@@ -84,7 +84,7 @@ class NMT(nn.Module):
         self.bidirectional = True
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-        self.loss = nn.NLLLoss(reduction='sum',ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
+        self.loss = nn.CrossEntropyLoss(reduction='sum',ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
 
         #self.attention = ConcatAttention(encoder_dim=self.attn_context_size,decoder_dim=self.hidden_size)
         self.attention = BilinearAttention(encoder_dim=self.attn_context_size, decoder_dim=self.hidden_size)
@@ -117,12 +117,15 @@ class NMT(nn.Module):
 
     def forward(self, src_sents: List[List[str]], tgt_sents: List[List[str]]) -> Tensor:
         #for src_sent,tgt_sent in zip(src_sents,tgt_sents):
-            #print(src_sent,tgt_sent)
-        src_encodings, decoder_init_state = self.encode(src_sents)
+        #    print(src_sent,tgt_sent)
+        src_sents, src_lens, tgt_sents, tgt_lens = \
+            utils.convert_to_tensor(src_sents, self.vocab.src, tgt_sents, self.vocab.tgt)
+
+        src_encodings, decoder_init_state = self.encode( src_sents,src_lens )
         scores = self.decode(src_encodings, decoder_init_state, tgt_sents)
         return scores
 
-    def encode(self, src_sents: List[List[str]]) -> Tuple[Tensor, Any]:
+    def encode(self, source,lens) -> Tuple[Tensor, Any]:
         """
         Use a GRU/LSTM to encode source sentences into hidden states
 
@@ -134,13 +137,13 @@ class NMT(nn.Module):
                 with shape (batch_size, source_sentence_length, encoding_dim), or in orther formats
             decoder_init_state: decoder GRU/LSTM's initial state, computed from source encodings
         """
-        source,lens = utils.convert_to_tensor(src_sents,self.vocab.src)
+
 #        print('input type', type(source))
         source = source.to(device)
         src_encodings,decoder_init_state = self.encoder(source,lens)
         return src_encodings, decoder_init_state
 
-    def decode(self, src_encodings: Tensor, decoder_init_state, tgt_sents: List[List[str]]):
+    def decode(self, src_encodings: Tensor, decoder_init_state, target):
         """
         Given source encodings, compute the log-likelihood of predicting the gold-standard target
         sentence tokens
@@ -155,10 +158,6 @@ class NMT(nn.Module):
                 log-likelihood of generating the gold-standard target sentence for 
                 each example in the input batch
         """
-        target, lens = utils.convert_to_tensor(tgt_sents,self.vocab.tgt.word2id)
-
-        #for i in range(len(lens)):
-        #    print(lens[i],tgt_sents[i],target[i])
 
         target = target.to(device)
         batch_size, max_len = target.size()
@@ -174,8 +173,7 @@ class NMT(nn.Module):
 
         outputs = torch.stack(outputs_list,dim=1)
         logits = self.decoder.linear(outputs)
-        predictions = F.log_softmax(logits, dim=2)
-        return target,predictions
+        return target,logits
 
     def criterion(self,targets,predictions):
         batch_size, max_len, vocab_size = predictions.size()
