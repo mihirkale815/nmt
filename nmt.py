@@ -360,7 +360,7 @@ class NMT(nn.Module):
         src_sent, src_len = \
             utils.convert_to_tensor_single(src_sent, self.vocab.src)
 
-        src_encodings, decoder_init_state = self.encode(src_sent, [src_len])
+        src_encodings, decoder_init_state = self.encode(src_sent, src_len)
         allHyps,allScores,allAttn = self.beam_search_decode(src_encodings, decoder_init_state,
                                                             max_decoding_time_step, beam_size)
 
@@ -386,7 +386,7 @@ class NMT(nn.Module):
         src_sent, src_len = \
             utils.convert_to_tensor_single(src_sent, self.vocab.src)
 
-        src_encodings, decoder_init_state = self.encode(src_sent,[src_len])
+        src_encodings, decoder_init_state = self.encode(src_sent,src_len)
         hyps = self.greedy_search_decode(src_encodings, decoder_init_state, max_decoding_time_step)
         hyps = [Hypothesis(hyps[0],1)]
         return hyps
@@ -648,6 +648,7 @@ def decode(args: Dict[str, str]):
     If the target gold-standard sentences are given, the function also computes
     corpus-level BLEU score.
     """
+#    pdb.set_trace()
     test_data_src = read_corpus(args['TEST_SOURCE_FILE'], source='src')
     if args['TEST_TARGET_FILE']:
         test_data_tgt = read_corpus(args['TEST_TARGET_FILE'], source='tgt')
@@ -661,13 +662,13 @@ def decode(args: Dict[str, str]):
 
 
 
-    hypotheses = beam_search(model, test_data_src,
-                             beam_size=int(args['--beam-size']),
+    #hypotheses = beam_search(model, test_data_src,
+     #                        beam_size=int(args['--beam-size']),
+      #                       max_decoding_time_step=int(args['--max-decoding-time-step']))
+
+
+    hypotheses = greedy_search(model, test_data_src,
                              max_decoding_time_step=int(args['--max-decoding-time-step']))
-
-
-    #hypotheses = greedy_search(model, test_data_src,
-    #                         max_decoding_time_step=int(args['--max-decoding-time-step']))
 
     if args['TEST_TARGET_FILE']:
         top_hypotheses = [ hyps[0] for hyps in hypotheses]
