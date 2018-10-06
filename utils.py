@@ -88,8 +88,9 @@ def F(sents,vocab,indices):
 
 def convert_to_tensor_single(sent,vocab):
     sent = torch.LongTensor([vocab[word] for word in sent])
+    lens = np.array([len(sent)])
     sent = torch.nn.utils.rnn.pad_sequence([sent], batch_first=True, padding_value=vocab['<pad>'])
-    return sent,len(sent)
+    return sent,lens
 
 
 
