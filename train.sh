@@ -32,18 +32,18 @@ echo save results to ${work_dir}
 #     --lr-decay 0.5 2>${work_dir}/err.log
 
 python nmt.py train \
-            --train-src='data/train.de-en.en.wmixerprep' \
-            --train-tgt='data/train.de-en.de.wmixerprep' \
-            --dev-src='data/valid.de-en.en.wmixerprep' \
-            --dev-tgt='data/valid.de-en.de.wmixerprep' \
+            --train-src='data/train.de-en.de.wmixerprep' \
+            --train-tgt='data/train.de-en.en.wmixerprep' \
+            --dev-src='data/valid.de-en.de.wmixerprep' \
+            --dev-tgt='data/valid.de-en.en.wmixerprep' \
             --vocab='data/vocab.bin' \
             --seed=0 \
-            --batch-size=8 \
-            --embed-size=32 \
-            --hidden-size=32 \
-            --valid-niter=50 \
+            --batch-size=64 \
+            --embed-size=256 \
+            --hidden-size=256 \
+            --valid-niter=2400 \
             --clip-grad=5 \
-            --log-every=10 \
+            --log-every=50 \
             --max-epoch=30 \
             --patience=5 \
             --max-num-trial=5 \
@@ -53,30 +53,20 @@ python nmt.py train \
             --uniform-init=0.1 \
             --save-to=experiments \
             --dropout=0.2 \
-            --max-decoding-time-step=70
+            --max-decoding-time-step=70 \
+            --cuda
 
 
 python nmt.py \
     decode \
     --max-decoding-time-step=100 \
-    --embed-size=32 \
-    --hidden-size=32 \
+    --embed-size=256 \
+    --hidden-size=256 \
     --beam-size=5 \
     --dropout=0.2 \
+    --cuda
     experiments/model_state_dict \
     ${test_src} \
-    ${work_dir}/decode.txt
+    ${work_dir}/decode_test.txt
 
-
-python nmt.py \
-    decode \
-    --max-decoding-time-step=100 \
-    --embed-size=32 \
-    --hidden-size=32 \
-    --beam-size=5 \
-    --dropout=0.2 \
-    experiments/model_state_dict \
-    data/test.de-en.de \
-    work_dir/decode.txt
-
-perl multi-bleu.perl ${test_tgt} < ${work_dir}/decode.txt
+perl multi-bleu.perl ${test_tgt} < ${work_dir}/decode_test.txt
