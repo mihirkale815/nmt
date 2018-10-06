@@ -96,10 +96,12 @@ class NMT(nn.Module):
                                   hidden_size=self.hidden_size,n_layers=self.n_dec_layers,attention=self.attention,
                                   dropout=0)
 
+        self.bow_decoder = torch.nn.Linear(self.hidden_size,len(vocab.tgt))
+        self.bow_loss = torch.nn.MultiLabelMarginLoss(reduction='sum')
 
 
 
-    def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]) -> Tensor:
+    def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]):
         """
         take a mini-batch of source and target sentences, compute the log-likelihood of 
         target sentences.
@@ -113,17 +115,22 @@ class NMT(nn.Module):
                 log-likelihood of generating the gold-standard target sentence for 
                 each example in the input batch
         """
-        return self.forward(src_sents,tgt_sents)
+        target, logits, bow_logits = self.forward(src_sents,tgt_sents)
+        loss = self.criterion(target,logits)
+        loss += self.bow_criterion(target,bow_logits)
+        return loss
 
-    def forward(self, src_sents: List[List[str]], tgt_sents: List[List[str]]) -> Tensor:
-        #for src_sent,tgt_sent in zip(src_sents,tgt_sents):
-        #    print(src_sent,tgt_sent)
+    def forward(self, src_sents: List[List[str]], tgt_sents: List[List[str]]):
         src_sents, src_lens, tgt_sents, tgt_lens = \
             utils.convert_to_tensor(src_sents, self.vocab.src, tgt_sents, self.vocab.tgt)
 
         src_encodings, decoder_init_state = self.encode( src_sents,src_lens )
-        scores = self.decode(src_encodings, decoder_init_state, tgt_sents)
-        return scores
+        target, logits, hiddens = self.decode(src_encodings, decoder_init_state, tgt_sents)
+
+        hiddens_pooled = hiddens.max(1)[0]
+        bow_logits = self.bow_decoder(hiddens_pooled)
+
+        return target,logits,bow_logits
 
     def encode(self, source,lens) -> Tuple[Tensor, Any]:
         """
@@ -163,24 +170,32 @@ class NMT(nn.Module):
         batch_size, max_len = target.size()
         outputs_list = []
         hidden = decoder_init_state
+        hiddens_list = [hidden[0].squeeze(0)]
 
         src_encodings = self.decoder.attention.linear(src_encodings)
 
         for idx in range(0, max_len-1):
             outputs, hidden, attn_scores = self.decoder(target[:, idx], hidden, src_encodings)
             outputs_list.append(outputs)
+            hiddens_list.append(hidden[0].squeeze(0))
 
-
+        hiddens = torch.stack(hiddens_list, dim=1)
         outputs = torch.stack(outputs_list,dim=1)
         logits = self.decoder.linear(outputs)
         target = target[:,1:]
-        return target,logits
+        return target,logits,hiddens
 
     def criterion(self,targets,predictions):
         batch_size, max_len, vocab_size = predictions.size()
         predictions = predictions.contiguous().view(batch_size * max_len, vocab_size)
         targets = targets.contiguous().view(batch_size * max_len)
         loss = self.loss(predictions, targets)
+        return loss
+
+    def bow_criterion(self,targets,logits):
+        batch_size,maxlen = targets.size()
+        targets = torch.zeros(batch_size,len(self.vocab.tgt)).scatter_(1,targets,1).long()
+        loss = self.bow_loss(logits,targets)
         return loss
 
     def beam_search_decode(self, src_encodings: Tensor, decoder_init_state, max_decoding_time_step, beam_size):
@@ -413,9 +428,7 @@ class NMT(nn.Module):
 
 
         for src_sents, tgt_sents in batch_iter(dev_data, batch_size):
-
-            target,predictions  = self.forward(src_sents, tgt_sents)
-            loss = self.criterion(target,predictions)
+            loss  = self.forward(src_sents, tgt_sents)
             cum_loss += loss.item()
             tgt_word_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting the leading `<s>`
             cum_tgt_words += tgt_word_num_to_predict
@@ -518,8 +531,8 @@ def train(args: Dict[str, str]):
             batch_size = len(src_sents)
 
             # (batch_size)
-            targets,predictions = model(src_sents, tgt_sents)
-            loss = model.criterion(targets,predictions)
+            loss = model(src_sents, tgt_sents)
+
 
             #if train_iter >= 1000 :
             #    for i in range(50):
