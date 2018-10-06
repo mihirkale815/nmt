@@ -97,7 +97,10 @@ class NMT(nn.Module):
                                   dropout=0)
 
         self.bow_decoder = torch.nn.Linear(self.hidden_size,len(vocab.tgt))
-        self.bow_loss = torch.nn.MultiLabelMarginLoss(reduction='sum')
+
+        weight = torch.ones(len(self.vocab.tgt))
+        weight[0] = 0
+        self.bow_loss = torch.nn.MultiLabelSoftMarginLoss(reduction='sum',weight=weight)
 
 
 
@@ -117,7 +120,8 @@ class NMT(nn.Module):
         """
         target, logits, bow_logits = self.forward(src_sents,tgt_sents)
         loss = self.criterion(target,logits)
-        loss += self.bow_criterion(target,bow_logits)
+        #loss += self.bow_criterion(target,bow_logits)
+        loss += self.compute_label_loss(target,logits)
         return loss
 
     def forward(self, src_sents: List[List[str]], tgt_sents: List[List[str]]):
@@ -191,6 +195,23 @@ class NMT(nn.Module):
         targets = targets.contiguous().view(batch_size * max_len)
         loss = self.loss(predictions, targets)
         return loss
+
+    def one_hot(self, seq_batch, depth):
+        out = torch.zeros(seq_batch.size()+torch.Size([depth])).to(device)
+        dim = len(seq_batch.size())
+        index = seq_batch.view(seq_batch.size()+torch.Size([1]))
+        return out.scatter_(dim, index, 1)
+
+    def compute_label_loss(self, targets, scores):
+        targets = targets.contiguous()
+        mask = torch.ge(targets, 0).float()
+        mask_scores = mask.unsqueeze(-1) * scores
+        #        mask_scores = self.softmax(mask_scores)
+        sum_scores = mask_scores.sum(0)
+        labels = self.one_hot(targets, len(self.vocab.tgt)).sum(0)
+        labels = torch.ge(labels, 0).float()
+        label_loss = self.bow_loss(sum_scores, labels)
+        return label_loss
 
     def bow_criterion(self,targets,logits):
         batch_size,maxlen = targets.size()
