@@ -221,23 +221,10 @@ class NMT(nn.Module):
 
     def beam_search_decode(self, src_encodings: Tensor, decoder_init_state, max_decoding_time_step, beam_size):
         
-        def var(a):
-            return Variable(a, volatile=True)
 
-        def rvar_src(a):
-            return var(a.repeat(beam_size,1, 1))
-
-        def rvar_hidden(a):
-            return var(a.repeat(1, beam_size, 1))
-
-        def bottle(m):
-            return m.view(1 * beam_size, -1)
-
-        def unbottle(m):
-            return m.view(beam_size, 1, -1)
 
         src_encodings = self.decoder.attention.linear(src_encodings)
-        src_encodings = rvar_src(src_encodings.data)
+
 
         # predictions = torch.zeros((beam_width, max_decoding_time_step))
         
@@ -245,10 +232,7 @@ class NMT(nn.Module):
         # hidden = decoder_init_state
         # inputs = torch.LongTensor([self.vocab.tgt.word2id['<s>'] for _ in range(beam_width)])
 
-        decState = (rvar_hidden(decoder_init_state[0].data), rvar_hidden(decoder_init_state[1].data))
-        # memory = decState[0][-1]
 
-        beam = [Beam_Class.Beam(beam_size, n_best=1)]
 
         # values = torch.zeros((beam_width, 1))
         
@@ -256,23 +240,6 @@ class NMT(nn.Module):
             # inputs is just ['<s>']. outputs is: (tgt_vocab_size), [no 'values' tensor gets added to outputs at idx 0 as the if condition checks that]
             # we get the values and indices as (beam_width). Now the future comments from line 204 onwards apply.
 
-        for idx in range(0, max_decoding_time_step):
-
-            if all((b.done() for b in beam)):
-                break
-
-            inp = var(torch.stack([b.getCurrentState() for b in beam]).t().contiguous().view(-1))
-
-
-            output, decState, attn = self.decoder.predict(inp, decState, src_encodings)
-
-            output = unbottle(output)
-            attn = unbottle(attn)
-
-            for j, b in enumerate(beam):
-                b.advance(output.data[:, j], attn.data[:, j])
-                b.beam_update(decState, j)
-                # b.beam_update_memory(memory, j)
 
             # outputs, hidden, attn_scores = self.decoder(inputs, hidden, src_encodings)
 
@@ -307,21 +274,7 @@ class NMT(nn.Module):
             # (indices % beam_width) will give me the new inputs for the next timestep. 
 
         
-        allHyps, allScores, allAttn = [], [], []
 
-        b = beam[0]
-        n_best = 1
-        scores, ks = b.sortFinished(minimum=n_best)
-        hyps, attn = [], []
-        for i, (times, k) in enumerate(ks[:n_best]):
-            hyp, att = b.getHyp(times, k)
-            hyps.append([k.item() for k in hyp])
-            attn.append(att.max(1)[1])
-        allHyps.append(hyps[0])
-        allScores.append(scores[0])
-        allAttn.append(attn[0])
-
-        return allHyps, allScores ,allAttn
 
             # indices = indices[0]
             # print (indices)
@@ -449,7 +402,7 @@ class NMT(nn.Module):
 
 
         for src_sents, tgt_sents in batch_iter(dev_data, batch_size):
-            loss  = self.forward(src_sents, tgt_sents)
+            loss  = self(src_sents, tgt_sents)
             cum_loss += loss.item()
             tgt_word_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting the leading `<s>`
             cum_tgt_words += tgt_word_num_to_predict
