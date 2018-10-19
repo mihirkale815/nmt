@@ -475,6 +475,9 @@ def compute_corpus_level_bleu_score(references: List[List[str]], hypotheses: Lis
 
 
 def train(args: Dict[str, str]):
+
+    model_path = args['--save-to']
+
     train_data_src = read_corpus(args['--train-src'], source='src')
     train_data_tgt = read_corpus(args['--train-tgt'], source='tgt')
 
@@ -490,9 +493,6 @@ def train(args: Dict[str, str]):
     dev_data = list(zip(dev_data_src, dev_data_tgt))
     test_data = list(zip(test_data_src, test_data_tgt))
 
-    #num_samples = 1000
-    #train_data = train_data[0:num_samples]
-    #dev_data = dev_data[0:num_samples]
 
     train_batch_size = int(args['--batch-size'])
     clip_grad = float(args['--clip-grad'])
@@ -506,7 +506,9 @@ def train(args: Dict[str, str]):
                 hidden_size=int(args['--hidden-size']),
                 dropout_rate=float(args['--dropout']),
                 vocab=vocab).to(device)
-    print('model',type(model))
+
+    # model.load_state_dict(torch.load(model_path))
+    print('model', type(model))
     num_trial = 0
     train_iter = patience = cum_loss = report_loss = cumulative_tgt_words = report_tgt_words = 0
     cumulative_examples = report_examples = epoch = valid_num = 0
@@ -529,13 +531,8 @@ def train(args: Dict[str, str]):
 
             batch_size = len(src_sents)
 
-            # (batch_size)
-            targets,predictions = model(src_sents, tgt_sents)
-            loss = model.criterion(targets,predictions)
-
-            #if train_iter >= 1000 :
-            #    for i in range(50):
-            #        print(src_sents[i],tgt_sents[i],torch.argmax(predictions, dim=2)[i], targets[i], "\n\n")
+            targets, predictions = model(src_sents, tgt_sents)
+            loss = model.criterion(targets, predictions)
 
             report_loss += loss.item()
             cum_loss += loss.item()
@@ -552,7 +549,9 @@ def train(args: Dict[str, str]):
             cumulative_examples += batch_size
 
             if train_iter % log_every == 0:
-                #print('heyyyyy')
+                print('total loss', report_loss)
+                print('total examples', report_examples)
+                print('total words', report_tgt_words)
                 print('epoch %d, iter %d, avg. loss %.4f, avg. ppl %.4f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
                                                                                          report_loss / report_examples,
@@ -635,17 +634,17 @@ def train(args: Dict[str, str]):
                     print('reached maximum number of epochs!')#, file=sys.stderr)
                     exit(0)
             
-            if train_iter % valid_niter == 0:
-                print("running decoding on text")
-                decode_epoch(args, epoch)
-                print("calculating perplexity for test")
-                cum_loss = cumulative_examples = cumulative_tgt_words = 0.
-    #            test_num += 1
-                torch.no_grad()
-                model.eval()
-                test_ppl = model.evaluate_ppl(test_data, batch_size=128)
-                valid_metric = -test_ppl
-                print('test: iter %d, test. ppl %f' % (train_iter, test_ppl))#, file=sys.stderr) 
+    #         if train_iter % valid_niter == 0:
+    #             print("running decoding on text")
+    #             decode_epoch(args, epoch)
+    #             print("calculating perplexity for test")
+    #             cum_loss = cumulative_examples = cumulative_tgt_words = 0.
+    # #            test_num += 1
+    #             torch.no_grad()
+    #             model.eval()
+    #             test_ppl = model.evaluate_ppl(test_data, batch_size=128)
+    #             valid_metric = -test_ppl
+    #             print('test: iter %d, test. ppl %f' % (train_iter, test_ppl))#, file=sys.stderr)
             
 def beam_search(model: NMT, test_data_src: List[List[str]], beam_size: int, max_decoding_time_step: int) -> List[List[Hypothesis]]:
     was_training = model.training

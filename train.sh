@@ -43,10 +43,10 @@ python nmt.py train \
             --model_path=experiments/model_state_dict \
             --out-file=${work_dir}\
             --seed=0 \
-            --batch-size=8 \
-            --embed-size=128 \
-            --hidden-size=128 \
-            --valid-niter=640 \
+            --batch-size=64 \
+            --embed-size=256 \
+            --hidden-size=256 \
+            --valid-niter=320 \
             --clip-grad=5 \
             --log-every=10 \
             --max-epoch=5 \
@@ -58,7 +58,7 @@ python nmt.py train \
             --save-to=experiments \
             --dropout=0.2 \
             --max-decoding-time-step=70 \
-            --cuda 
+
 
            
 
