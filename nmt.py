@@ -4,7 +4,7 @@
 A very basic implementation of neural machine translation
 
 Usage:
-    nmt.py train --train-src=<file> --train-tgt=<file> --dev-src=<file> --dev-tgt=<file> --vocab=<file> [options]
+    nmt.py train --train-src=<file> --train-tgt=<file> --dev-src=<file> --dev-tgt=<file> --vocab=<file> --test-src=<file> --test-tgt=<file> --beam_size=<int> --model_path=<file> --out-file=<file> [options]
     nmt.py decode [options] MODEL_PATH TEST_SOURCE_FILE OUTPUT_FILE
     nmt.py decode [options] MODEL_PATH TEST_SOURCE_FILE TEST_TARGET_FILE OUTPUT_FILE
 
@@ -16,6 +16,11 @@ Options:
     --dev-src=<file>                        dev source file
     --dev-tgt=<file>                        dev target file
     --vocab=<file>                          vocab file
+    --test-src=<file>
+    --test-tgt=<file>
+    --beam_size=<int>
+    --model_path=<file>
+    --out-file=<file>
     --seed=<int>                            seed [default: 0]
     --batch-size=<int>                      batch size [default: 32]
     --embed-size=<int>                      embedding size [default: 256]
@@ -33,6 +38,8 @@ Options:
     --valid-niter=<int>                     perform validation after how many iterations [default: 2000]
     --dropout=<float>                       dropout [default: 0.2]
     --max-decoding-time-step=<int>          maximum number of decoding time steps [default: 70]
+   
+
 """
 
 import math
@@ -473,10 +480,15 @@ def train(args: Dict[str, str]):
 
     dev_data_src = read_corpus(args['--dev-src'], source='src')
     dev_data_tgt = read_corpus(args['--dev-tgt'], source='tgt')
-
+    print(args['--test-src'], args['--train-src'])
+    print(type(args['--test-src']))
+    print(type(args['--train-src']))
+    test_data_src = read_corpus(args['--test-src'], source='src')
+    test_data_tgt = read_corpus(args['--test-tgt'], source='tgt')
 
     train_data = list(zip(train_data_src, train_data_tgt))
     dev_data = list(zip(dev_data_src, dev_data_tgt))
+    test_data = list(zip(test_data_src, test_data_tgt))
 
     #num_samples = 1000
     #train_data = train_data[0:num_samples]
@@ -540,16 +552,20 @@ def train(args: Dict[str, str]):
             cumulative_examples += batch_size
 
             if train_iter % log_every == 0:
+                #print('heyyyyy')
                 print('epoch %d, iter %d, avg. loss %.4f, avg. ppl %.4f ' \
                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
                                                                                          report_loss / report_examples,
                                                                                          math.exp(report_loss / report_tgt_words),
                                                                                          cumulative_examples,
                                                                                          report_tgt_words / (time.time() - train_time),
-                                                                                         time.time() - begin_time), file=sys.stderr)
+                                                                                         time.time() - begin_time))#, file=sys.stderr)
 
                 train_time = time.time()
                 report_loss = report_tgt_words = report_examples = 0.
+            
+
+                
 
             # the following code performs validation on dev set, and controls the learning schedule
             # if the dev score is better than the last check point, then the current model is saved.
@@ -561,12 +577,12 @@ def train(args: Dict[str, str]):
                 print('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
                                                                                          cum_loss / cumulative_examples,
                                                                                          np.exp(cum_loss / cumulative_tgt_words),
-                                                                                         cumulative_examples), file=sys.stderr)
+                                                                                         cumulative_examples))#, file=sys.stderr)
 
                 cum_loss = cumulative_examples = cumulative_tgt_words = 0.
                 valid_num += 1
 
-                print('begin validation ...', file=sys.stderr)
+                print('begin validation ...')#, file=sys.stderr)
 
                 # compute dev. ppl and bleu
                 torch.no_grad()
@@ -574,7 +590,7 @@ def train(args: Dict[str, str]):
                 dev_ppl = model.evaluate_ppl(dev_data, batch_size=128)   # dev batch size can be a bit larger
                 valid_metric = -dev_ppl
 
-                print('validation: iter %d, dev. ppl %f' % (train_iter, dev_ppl), file=sys.stderr)
+                print('validation: iter %d, dev. ppl %f' % (train_iter, dev_ppl))#, file=sys.stderr)
 
                 is_better = len(hist_valid_scores) == 0 or valid_metric > max(hist_valid_scores)
                 hist_valid_scores.append(valid_metric)
@@ -582,26 +598,26 @@ def train(args: Dict[str, str]):
 
                 if is_better:
                     patience = 0
-                    print('save currently the best model to [%s]' % model_save_path, file=sys.stderr)
+                    print('save currently the best model to [%s]' % model_save_path)#, file=sys.stderr)
                     #model.save(model_save_path)
                     torch.save(model.state_dict(),model_save_path)
 
                     # You may also save the optimizer's state
                 elif patience < int(args['--patience']):
                     patience += 1
-                    print('hit patience %d' % patience, file=sys.stderr)
+                    print('hit patience %d' % patience)#, file=sys.stderr)
 
                     if patience == int(args['--patience']):
                         num_trial += 1
-                        print('hit #%d trial' % num_trial, file=sys.stderr)
+                        print('hit #%d trial' % num_trial)#, file=sys.stderr)
                         if num_trial == int(args['--max-num-trial']):
-                            print('early stop!', file=sys.stderr)
+                            print('early stop!',)# file=sys.stderr)
                             exit(0)
 
                         # decay learning rate, and restore from previously best checkpoint
                         scheduler.step()
                         print("Modified learning rate...")
-                        print('loading previously best model and decaying learning rate', file=sys.stderr)
+                        print('loading previously best model and decaying learning rate')#, file=sys.stderr)
                         for param_group in optimizer.param_groups:
                             print("lr for param group =",param_group['lr'])
 
@@ -616,10 +632,21 @@ def train(args: Dict[str, str]):
                         patience = 0
 
                 if epoch == int(args['--max-epoch']):
-                    print('reached maximum number of epochs!', file=sys.stderr)
+                    print('reached maximum number of epochs!')#, file=sys.stderr)
                     exit(0)
-
-
+            
+            if train_iter % valid_niter == 0:
+                print("running decoding on text")
+                decode_epoch(args, epoch)
+                print("calculating perplexity for test")
+                cum_loss = cumulative_examples = cumulative_tgt_words = 0.
+    #            test_num += 1
+                torch.no_grad()
+                model.eval()
+                test_ppl = model.evaluate_ppl(test_data, batch_size=128)
+                valid_metric = -test_ppl
+                print('test: iter %d, test. ppl %f' % (train_iter, test_ppl))#, file=sys.stderr) 
+            
 def beam_search(model: NMT, test_data_src: List[List[str]], beam_size: int, max_decoding_time_step: int) -> List[List[Hypothesis]]:
     was_training = model.training
 
@@ -641,6 +668,34 @@ def greedy_search(model: NMT, test_data_src: List[List[str]], max_decoding_time_
         hypotheses.append(example_hyps)
     return hypotheses
 
+
+def decode_epoch(args, epoch):
+    test_data_src = read_corpus(args['--test-src'], source='src')
+    if args['--test-tgt']:
+        test_data_tgt = read_corpus(args['--test-tgt'], source='tgt')
+    num_samples = len(test_data_src) #10
+    test_data_src = test_data_src[0:num_samples]
+    test_data_tgt = test_data_tgt[0:num_samples]
+
+    print("load model from {args['--model_path']}", file=sys.stderr)
+    model = NMT.load(args['--model_path'])
+    
+    hypotheses = greedy_search(model, test_data_src,
+                             max_decoding_time_step=int(args['--max-decoding-time-step']))
+
+    if args['--test-tgt']:
+        top_hypotheses = [ hyps[0] for hyps in hypotheses]
+        bleu_score = compute_corpus_level_bleu_score(test_data_tgt, top_hypotheses)
+        print('Corpus BLEU:',bleu_score, file=sys.stderr)
+
+    vocab = pickle.load(open('data/vocab.bin', 'rb'))
+    output_file = args['--out-file']+'/decode_'+str(epoch)+'.txt'
+    with open(output_file, 'w') as f:
+        for src_sent, hyps in zip(test_data_src, hypotheses):
+            top_hyp = hyps[0].value
+            top_hyp = [vocab.tgt.id2word[int(word)] for word in top_hyp]
+            hyp_sent = ' '.join(top_hyp)
+            f.write(hyp_sent + '\n')
 
 def decode(args: Dict[str, str]):
     """
@@ -691,6 +746,9 @@ def main():
     # also want to seed the RNG of tensorflow, pytorch, dynet, etc.
     seed = int(args['--seed'])
     np.random.seed(seed * 13 // 7)
+    
+    
+
 
     if args['train']:
         train(args)
