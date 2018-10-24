@@ -106,6 +106,8 @@ class NMT(nn.Module):
 
     def forward(self, src_sents, tgt_sents):
         src_sents, src_lens, tgt_sents, tgt_lens, source_mask, target_mask = utils.convert_to_tensor(src_sents, self.vocab.src, tgt_sents, self.vocab.tgt)
+        source_mask = source_mask.to(device)
+        target_mask = target_mask.to(device)
         src_encodings, encoder_final = self.encode(src_sents, src_lens)
         tgt = tgt_sents[:, :-1]
         tgt_y = tgt_sents[:, 1:]
