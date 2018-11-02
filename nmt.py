@@ -59,20 +59,63 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 import os
 import torch.cuda as cuda
-from beam import Beam
+#from beam import Beam
 from torch.autograd import Variable
 import pdb
 
-import beam as Beam_Class
+#import beam as Beam_Class
 import torch.nn.functional as F
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
 args = docopt(__doc__)
 device = torch.device("cuda" if args['--cuda'] else "cpu")
 
+
+def isFloat(x):
+    try:
+        float(x)
+        return True
+    except:
+        return False
+
+
+def create_embed_matrix(file_path, vocab):
+
+    embedding_dim = 300
+    vocab_size = len(vocab)
+    print(vocab_size, 'vocab size')
+    embeddings_index = {}
+    f = open(file_path)
+    i = 0
+
+    for line in f:
+        values = line.split()
+        if len(values) < 3:
+            continue
+        i += 1
+        num_words = 0
+        for j in range(len(values)):
+            if isFloat(values[j]):
+                break
+            else:
+                num_words += 1
+
+        coefs = np.asarray(values[num_words:], dtype='float32')
+        for idx in range(num_words):
+            embeddings_index[values[idx]] = coefs
+    print('done reading embedding file')
+
+    embedding_matrix = np.zeros((vocab_size, embedding_dim))
+    for word in vocab.word2id:
+        embedding_vector = embeddings_index.get(word)
+        if embedding_vector is not None:
+            embedding_matrix[vocab.word2id[word]] = embedding_vector
+    print("returning")
+    return embedding_matrix
+
 class NMT(nn.Module):
 
-    def __init__(self, embed_size, hidden_size, vocab, dropout_rate=0.2):
+    def __init__(self, embed_size, hidden_size, vocab, src_embed, tgt_embed, dropout_rate=0.2):
         super(NMT, self).__init__()
 
         self.embed_size = embed_size
@@ -90,11 +133,11 @@ class NMT(nn.Module):
         self.attention = BilinearAttention(encoder_dim=self.attn_context_size, decoder_dim=self.hidden_size)
 
         self.encoder = RNNEncoder(vocab=self.vocab.src,embed_size=self.embed_size,bidirectional=self.bidirectional,
-                                  hidden_size=self.hidden_size,n_layers=self.n_enc_layers,dropout=self.dropout_rate)
+                                  hidden_size=self.hidden_size,n_layers=self.n_enc_layers,dropout=self.dropout_rate, source_embed=src_embed, use_pretrained=True)
 
         self.decoder = RNNDecoder(vocab=self.vocab.tgt,embed_size=self.embed_size,context_size=self.hidden_size,
                                   hidden_size=self.hidden_size,n_layers=self.n_dec_layers,attention=self.attention,
-                                  dropout=0)
+                                  dropout=0, target_embed=tgt_embed, use_pretrained=True)
 
         self.bow_decoder = torch.nn.Linear(self.hidden_size,len(vocab.tgt))
 
@@ -477,8 +520,14 @@ def train(args: Dict[str, str]):
 
     vocab = pickle.load(open(args['--vocab'], 'rb'))
 
+    embed_matrix_src = create_embed_matrix('data/wiki.gl.vec', vocab.src)
+    print('source embed matrix created')
+
+    embed_matrix_tgt = create_embed_matrix('data/wiki.en.vec', vocab.tgt)
+    print('target embed matrix created')
+
     model = NMT(embed_size=int(args['--embed-size']),
-                hidden_size=int(args['--hidden-size']),
+                hidden_size=int(args['--hidden-size']), src_embed=embed_matrix_src, tgt_embed=embed_matrix_tgt,
                 dropout_rate=float(args['--dropout']),
                 vocab=vocab).to(device)
     print('model',type(model))
