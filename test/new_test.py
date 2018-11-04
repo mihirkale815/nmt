@@ -62,7 +62,7 @@ from modules.attention import BahdanauAttention
 seed = 42
 np.random.seed(seed)
 torch.manual_seed(seed)
-cuda = True
+cuda = False
 args = docopt(__doc__)
 device = torch.device("cuda" if cuda else "cpu")
 DEVICE=torch.device('cuda:0')
@@ -169,7 +169,7 @@ class Generator(nn.Module):
         return F.log_softmax(self.proj(x), dim=-1)
 
 
-def run_epoch(train_data, vocab, model, loss_compute, print_every=10):
+def run_epoch(train_data, vocab, model, loss_compute, print_every=10, train_ss_data=None, ss_batch_ratio=5):
 
     start = time.time()
     total_tokens = 0
@@ -177,14 +177,41 @@ def run_epoch(train_data, vocab, model, loss_compute, print_every=10):
     print_tokens = 0
 
     i = 0
+    batch_size = 64
+    batch_no = -1
 
-    for src_sents, tgt_sents in batch_iter(train_data, batch_size=64, shuffle=True):
+
+    if train_data : batch_iterator_ss = batch_iter(train_ss_data, batch_size=batch_size, shuffle=True)
+    batch_iterator = batch_iter(train_data, batch_size=batch_size, shuffle=True)
+
+    while True:
+        batch_no += 1
+
+        if train_ss_data and batch_no % ss_batch_ratio != 0:
+            is_ss_batch = True
+            sents = next(batch_iterator_ss, None)
+            if not sents:
+                batch_iterator_ss = batch_iter(train_ss_data, batch_size=batch_size, shuffle=True)
+                sents = next(batch_iterator_ss, None)
+
+
+        else:
+            sents = next(batch_iterator, None)
+            is_ss_batch = False
+            if not sents:
+                batch_iterator = batch_iter(train_data, batch_size=batch_size, shuffle=True)
+                sents = next(batch_iterator_ss, None)
+
+
+        src_sents, tgt_sents = sents
+
+
         i += 1
         src_sents, src_lens, tgt_sents, tgt_lens, source_mask, target_mask = utils.convert_to_tensor(src_sents, vocab.src, tgt_sents, vocab.tgt)
         tgt_y = tgt_sents[:, 1:]
         tgt = tgt_sents[:, :-1]
         out, _, pre_output = model.forward(src_sents, tgt, source_mask, target_mask, src_lens, tgt_lens)
-        loss = loss_compute(pre_output, tgt_y, 64)
+        loss = loss_compute(pre_output, tgt_y, batch_size,is_main=not is_ss_batch,is_aux=True)
         total_loss += loss
         ntokens = (tgt_sents!= 0).data.sum().item()
 
@@ -193,14 +220,14 @@ def run_epoch(train_data, vocab, model, loss_compute, print_every=10):
 
         if model.training and i % print_every == 0:
             elapsed = time.time() - start
-            print('epoch %d, avg. loss %.4f, avg. ppl %.4f, speed %.2f words/sec, time elapsed %.2f sec' % (i, loss / 64, math.exp(total_loss/total_tokens), (print_tokens / elapsed), elapsed))
+            print('epoch %d, avg. loss %.4f, avg. ppl %.4f, speed %.2f words/sec, time elapsed %.2f sec' % (i, loss / batch_size, math.exp(total_loss/total_tokens), (print_tokens / elapsed), elapsed))
             #elapsed = time.time() - start
             #print("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
              #     (i, loss / 64, print_tokens / elapsed))
             start = time.time()
             print_tokens = 0
             #print('perplexity: ', math.exp(total_loss/total_tokens))
-
+        break
 
     return math.exp(total_loss / float(total_tokens))
 
@@ -224,6 +251,54 @@ class SimpleLossCompute:
             self.opt.zero_grad()
 
         return loss.data.item() * norm
+
+class MultiTaskLossCompute:
+
+    def __init__(self, generator, criterion, aux_criterion, opt=None, vocab=None):
+        self.generator = generator
+        self.criterion = criterion
+        self.aux_criterion = aux_criterion
+        self.opt = opt
+        self.vocab = vocab
+
+
+    def __call__(self, x, y, norm,is_main,is_aux):
+        x = self.generator(x)
+        loss = self.criterion(x.contiguous().view(-1, x.size(-1)),
+                              y.contiguous().view(-1))
+        loss = loss / norm
+
+        aux_loss = self.compute_label_loss(y,x)
+
+        if self.opt is not None:
+            if is_main and is_aux :
+                (loss+aux_loss).backward()
+            elif not is_main and is_aux:
+                aux_loss.backward()
+            elif is_main and not is_aux:
+                loss.backward()
+
+            self.opt.step()
+            self.opt.zero_grad()
+
+        return loss.data.item() * norm
+
+    def one_hot(self, seq_batch, depth):
+        out = torch.zeros(seq_batch.size()+torch.Size([depth])).to(device)
+        dim = len(seq_batch.size())
+        index = seq_batch.view(seq_batch.size()+torch.Size([1]))
+        return out.scatter_(dim, index, 1)
+
+    def compute_label_loss(self, targets, scores):
+        targets = targets.contiguous()
+        mask = torch.ge(targets, 0).float()
+        mask_scores = mask.unsqueeze(-1) * scores
+        #        mask_scores = self.softmax(mask_scores)
+        sum_scores = mask_scores.sum(0)
+        labels = self.one_hot(targets, len(self.vocab.tgt)).sum(0)
+        labels = torch.ge(labels, 0).float()
+        label_loss = self.aux_criterion(sum_scores, labels)
+        return label_loss
 
 
 def greedy_decode(model, src, src_mask, src_lengths, max_len=70, sos_index=1, eos_index=None):
@@ -275,6 +350,8 @@ def print_examples(valid_data, model, vocab, n=2, max_len=70,
     print()
 
     i = 0
+
+
     for src_sents, tgt_sents in batch_iter(valid_data, batch_size=1, shuffle=False):
         i += 1
         src_sents, src_lens, tgt_sents, tgt_lens, source_mask, target_mask = utils.convert_to_tensor(src_sents, vocab.src, tgt_sents, vocab.tgt)
@@ -320,6 +397,7 @@ def train(model, vocab, train_data, valid_data, test_data, test_data_src, model_
     patience_thresh = 1
     max_num_trial = 5
     criterion = nn.NLLLoss(reduction="sum", ignore_index=0)
+    aux_criterion = nn.MultiLabelSoftMarginLoss(reduction='sum')
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.5, last_epoch=-1)
     hist_valid_scores = []
@@ -330,12 +408,20 @@ def train(model, vocab, train_data, valid_data, test_data, test_data_src, model_
         epoch += 1
         print("Epoch", epoch)
         model.train()
-        train_perplexity = run_epoch(train_data, vocab, model, SimpleLossCompute(model.generator, criterion, optimizer, vocab), print_every=print_every)
+
+
+        train_perplexity = run_epoch(train_data, vocab, model, MultiTaskLossCompute(model.generator, criterion,
+                                                                                    aux_criterion, opt=optimizer,
+                                                                                    vocab=vocab),
+                                                                                    print_every=print_every)
 
         model.eval()
         with torch.no_grad():
             print_examples(valid_data, model, vocab)
-            dev_perplexity = run_epoch(valid_data, vocab, model, SimpleLossCompute(model.generator, criterion, None, vocab), print_every=print_every)
+            dev_perplexity = run_epoch(valid_data, vocab, model, MultiTaskLossCompute(model.generator, criterion,
+                                                                                      aux_criterion,
+                                                                                      None, vocab=vocab),
+                                                                                      print_every=print_every)
             valid_metric = -dev_perplexity
             is_better = len(hist_valid_scores) == 0 or valid_metric > max(hist_valid_scores)
             hist_valid_scores.append(valid_metric)
@@ -384,22 +470,27 @@ def main():
     dev_data = list(zip(dev_data_src, dev_data_tgt))
     test_data = list(zip(test_data_src, test_data_tgt))
 
-    train_batch_size = 64
+    train_batch_size = 2
     clip_grad = float(5)
     valid_niter = 180
     log_every = 10
+    use_pretrained = False
+    embed_matrix_src = None
+    embed_matrix_tgt = None
+
     model_save_path = os.path.join('experiments/', 'model_gl_concat_embed')
     vocab = pickle.load(open('data/vocab.bin', 'rb'))
-    embed_matrix_src = create_embed_matrix('data/wiki.gl.vec', vocab.src)
-    print('source embed matrix created')
 
-    embed_matrix_tgt = create_embed_matrix('data/wiki.en.vec', vocab.tgt)
-    print('target embed matrix created')
-    #embed_matrix_src = None
-    #embed_matrix_tgt = None
+    if use_pretrained:
+        embed_matrix_tgt = create_embed_matrix('data/wiki.en.vec', vocab.tgt)
+        print('target embed matrix created')
+
+        embed_matrix_src = create_embed_matrix('data/wiki.gl.vec', vocab.src)
+        print('source embed matrix created')
+
     generator = Generator(256, len(vocab.tgt))
   #  model = NMT(vocab=vocab, embed_size=300, hidden_size=256, generator=generator)
-    model = NMT(vocab=vocab, embed_size=300, hidden_size=256, generator=generator, use_pretrained=True, embed_matrix_src=embed_matrix_src, embed_matrix_tgt=embed_matrix_tgt)
+    model = NMT(vocab=vocab, embed_size=300, hidden_size=256, generator=generator, use_pretrained=use_pretrained, embed_matrix_src=embed_matrix_src, embed_matrix_tgt=embed_matrix_tgt)
 #    model.load_state_dict(torch.load(model_save_path))    
     print('created model')
     dev_perplexities = train(model, vocab, train_data, dev_data, test_data, test_data_src, model_save_path, print_every=10)
