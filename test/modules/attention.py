@@ -4,27 +4,43 @@ import torch.nn.functional as F
 
 
 class BahdanauAttention(nn.Module):
-    def __init__(self, hidden_size, key_size, query_size):
+    def __init__(self, hidden_size, key_size=None, query_size=None):
         super(BahdanauAttention, self).__init__()
-        self.hidden_size = hidden_size
-        self.key_size = 2*key_size
-        self.query_size = query_size
 
-        self.key_linear = nn.Linear(self.key_size, hidden_size, bias=False)
-        self.query_linear = nn.Linear(self.query_size, hidden_size, bias=False)
-        self.energy_linear = nn.Linear(self.hidden_size, 1, bias=False)
+        # We assume a bi-directional encoder so key_size is 2*hidden_size
+        key_size = 2 * hidden_size if key_size is None else key_size
+        query_size = hidden_size if query_size is None else query_size
 
-        self.attn_scores = None
+        self.key_layer = nn.Linear(key_size, hidden_size, bias=False)
+        self.query_layer = nn.Linear(query_size, hidden_size, bias=False)
+        self.energy_layer = nn.Linear(hidden_size, 1, bias=False)
 
-    def forward(self, query, key, value, mask):
-        query = self.query_linear(query)
-        scores = self.energy_linear(torch.tanh(query+key))
+        # to store attention scores
+        self.alphas = None
+
+    def forward(self, query=None, proj_key=None, value=None, mask=None):
+        assert mask is not None, "mask is required"
+
+        # We first project the query (the decoder state).
+        # The projected keys (the encoder states) were already pre-computated.
+        query = self.query_layer(query)
+
+        # Calculate scores.
+        scores = self.energy_layer(torch.tanh(query + proj_key))
         scores = scores.squeeze(2).unsqueeze(1)
 
+        # Mask out invalid positions.
+        # The mask marks valid positions so we invert it using `mask & 0`.
         scores.data.masked_fill_(mask == 0, -float('inf'))
 
-        attn_scores = F.softmax(scores, dim=-1)
-        self.attn_scores = attn_scores
-        context = torch.bmm(attn_scores, value)
+        # Turn scores to probabilities.
+        alphas = F.softmax(scores, dim=-1)
+        self.alphas = alphas
 
-        return context, self.attn_scores
+        # The context vector is the weighted sum of the values.
+        context = torch.bmm(alphas, value)
+
+        # context shape: [B, 1, 2D], alphas shape: [B, 1, M]
+        return context, alphas
+
+
