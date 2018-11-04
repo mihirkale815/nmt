@@ -47,6 +47,7 @@ import pickle
 import sys
 import time
 from collections import namedtuple
+import itertools
 
 import numpy as np
 from typing import List, Tuple, Dict, Set, Union, Any
@@ -91,7 +92,6 @@ class NMT(nn.Module):
         self.bidirectional = True
         self.attn_context_size = (2 if self.bidirectional else 1) * self.hidden_size
         # initialize neural network layers...
-        self.loss = nn.CrossEntropyLoss(reduction='sum', ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
 
         #self.attention = ConcatAttention(encoder_dim=self.attn_context_size,decoder_dim=self.hidden_size)
         self.attention = BilinearAttention(encoder_dim=self.attn_context_size, decoder_dim=self.hidden_size)
@@ -102,6 +102,15 @@ class NMT(nn.Module):
         self.decoder = RNNDecoder(vocab=self.vocab.tgt, embed_size=self.embed_size, context_size=self.hidden_size,
                                   hidden_size=self.hidden_size, n_layers=self.n_dec_layers, attention=self.attention,
                                   dropout=0)
+
+        self.bow_decoder = torch.nn.Linear(self.hidden_size, len(vocab.tgt))
+
+        self.loss = nn.CrossEntropyLoss(reduction='sum', ignore_index=self.vocab.tgt.word2id['<pad>']).to(device)
+
+        weight = torch.ones(len(self.vocab.tgt))
+        weight[0] = 0
+        self.bow_loss = torch.nn.MultiLabelSoftMarginLoss(reduction='sum', weight=weight)
+
 
     def __call__(self, src_sents: List[List[str]], tgt_sents: List[List[str]]) -> Tensor:
         """
@@ -176,6 +185,7 @@ class NMT(nn.Module):
 
         outputs = torch.stack(outputs_list, dim=1)
         logits = self.decoder.linear(outputs)
+        #bow_logits = self.bow_decoder(torch.max(src_encodings))
         target = target[:, 1:]
         return target, logits
 
@@ -184,7 +194,25 @@ class NMT(nn.Module):
         predictions = predictions.contiguous().view(batch_size * max_len, vocab_size)
         targets = targets.contiguous().view(batch_size * max_len)
         loss = self.loss(predictions, targets)
-        return loss
+        bow_loss = self.compute_label_loss(targets, predictions)
+        return loss,bow_loss
+
+    def one_hot(self, seq_batch, depth):
+        out = torch.zeros(seq_batch.size()+torch.Size([depth])).to(device)
+        dim = len(seq_batch.size())
+        index = seq_batch.view(seq_batch.size()+torch.Size([1]))
+        return out.scatter_(dim, index, 1)
+
+    def compute_label_loss(self, targets, scores):
+        targets = targets.contiguous()
+        mask = torch.ge(targets, 0).float()
+        mask_scores = mask.unsqueeze(-1) * scores
+        #        mask_scores = self.softmax(mask_scores)
+        sum_scores = mask_scores.sum(0)
+        labels = self.one_hot(targets, len(self.vocab.tgt)).sum(0)
+        labels = torch.ge(labels, 0).float()
+        label_loss = self.bow_loss(sum_scores, labels)
+        return label_loss
 
     def beam_search_decode(self, src_encodings: Tensor, decoder_init_state, max_decoding_time_step, beam_size):
         
@@ -413,7 +441,7 @@ class NMT(nn.Module):
         for src_sents, tgt_sents in batch_iter(dev_data, batch_size):
 
             target, predictions = self.forward(src_sents, tgt_sents)
-            loss = self.criterion(target, predictions)
+            loss,bow_loss = self.criterion(target, predictions)
             cum_loss += loss.item()
             tgt_word_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting the leading `<s>`
             cum_tgt_words += tgt_word_num_to_predict
@@ -472,17 +500,20 @@ def train(args: Dict[str, str]):
     train_data_src = read_corpus(args['--train-src'], source='src')
     train_data_tgt = read_corpus(args['--train-tgt'], source='tgt')
 
+    train_ss_data_src = read_corpus(args['--train-ss-src'], source='src')
+    train_ss_data_tgt = read_corpus(args['--train-ss-tgt'], source='tgt')
+
     dev_data_src = read_corpus(args['--dev-src'], source='src')
     dev_data_tgt = read_corpus(args['--dev-tgt'], source='tgt')
-    print(args['--test-src'], args['--train-src'])
-    print(type(args['--test-src']))
-    print(type(args['--train-src']))
+
     test_data_src = read_corpus(args['--test-src'], source='src')
     test_data_tgt = read_corpus(args['--test-tgt'], source='tgt')
 
     train_data = list(zip(train_data_src, train_data_tgt))
     dev_data = list(zip(dev_data_src, dev_data_tgt))
     test_data = list(zip(test_data_src, test_data_tgt))
+
+    train_ss_data = list(zip(train_ss_data_src, train_ss_data_tgt))
 
 
     train_batch_size = int(args['--batch-size'])
@@ -510,121 +541,152 @@ def train(args: Dict[str, str]):
     lr = float(args['--lr'])
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.5, last_epoch=-1)
-    
+
+    batch_iterator_ss = batch_iter(train_ss_data, batch_size=train_batch_size, shuffle=True)
+    batch_iterator =  batch_iter(train_data, batch_size=train_batch_size, shuffle=True)
+
+    batch_no = -1
+    ss_batch_ratio = 5
+    max_epoch = int(args['--max-epoch'])
+    is_ss_batch = False
+
     while True:
-        epoch += 1
+        batch_no +=1
 
-        for src_sents, tgt_sents in batch_iter(train_data, batch_size=train_batch_size, shuffle=True):
-            torch.set_grad_enabled(True)
-            model.train()
 
-            train_iter += 1
+        if batch_no%ss_batch_ratio != 0:
+            is_ss_batch = True
+            sents = next(batch_iterator_ss,None)
+            if not sents :
+                batch_iterator_ss = batch_iter(train_ss_data, batch_size=train_batch_size, shuffle=True)
+                continue
+        else:
+            sents = next(batch_iterator, None)
+            is_ss_batch = False
+            if not sents:
+                batch_iterator = batch_iter(train_data, batch_size=train_batch_size, shuffle=True)
+                epoch += 1
+                continue
 
-            batch_size = len(src_sents)
+        src_sents, tgt_sents = sents
 
-            targets, predictions = model(src_sents, tgt_sents)
-            loss = model.criterion(targets, predictions)
 
-            report_loss += loss.item()
-            cum_loss += loss.item()
+        torch.set_grad_enabled(True)
+        model.train()
 
-            optimizer.zero_grad()
+        train_iter += 1
+
+        batch_size = len(src_sents)
+
+        targets, predictions = model(src_sents, tgt_sents)
+        loss,bow_loss = model.criterion(targets, predictions)
+
+        report_loss += loss.item()
+        cum_loss += loss.item()
+
+        optimizer.zero_grad()
+
+        if is_ss_batch:
+            bow_loss.backward()
+        else:
+            loss += bow_loss
             loss.backward()
-            optimizer.step()
-            nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
 
-            tgt_words_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting leading `<s>`
-            report_tgt_words += tgt_words_num_to_predict
-            cumulative_tgt_words += tgt_words_num_to_predict
-            report_examples += batch_size
-            cumulative_examples += batch_size
+        optimizer.step()
+        nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
 
-            if train_iter % log_every == 0:
-                #print('total loss', report_loss)
-                #print('total examples', report_examples)
-                #print('total words', report_tgt_words)
-                print('epoch %d, iter %d, avg. loss %.4f, avg. ppl %.4f ' \
-                      'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
-                                                                                         report_loss / report_examples,
-                                                                                         math.exp(report_loss / report_tgt_words),
-                                                                                         cumulative_examples,
-                                                                                         report_tgt_words / (time.time() - train_time),
-                                                                                         time.time() - begin_time))#, file=sys.stderr)
+        tgt_words_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting leading `<s>`
+        report_tgt_words += tgt_words_num_to_predict
+        cumulative_tgt_words += tgt_words_num_to_predict
+        report_examples += batch_size
+        cumulative_examples += batch_size
 
-                train_time = time.time()
-                report_loss = report_tgt_words = report_examples = 0.
-            
+        if train_iter % log_every == 0:
+            #print('total loss', report_loss)
+            #print('total examples', report_examples)
+            #print('total words', report_tgt_words)
+            print('epoch %d, iter %d, avg. loss %.4f, avg. ppl %.4f ' \
+                  'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
+                                                                                     report_loss / report_examples,
+                                                                                     math.exp(report_loss / report_tgt_words),
+                                                                                     cumulative_examples,
+                                                                                     report_tgt_words / (time.time() - train_time),
+                                                                                     time.time() - begin_time))#, file=sys.stderr)
 
-                
-
-            # the following code performs validation on dev set, and controls the learning schedule
-            # if the dev score is better than the last check point, then the current model is saved.
-            # otherwise, we allow for that performance degeneration for up to `--patience` times;
-            # if the dev score does not increase after `--patience` iterations, we reload the previously
-            # saved best model (and the state of the optimizer), halve the learning rate and continue
-            # training. This repeats for up to `--max-num-trial` times.
-            if train_iter % valid_niter == 0:
-                print('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
-                                                                                         cum_loss / cumulative_examples,
-                                                                                         np.exp(cum_loss / cumulative_tgt_words),
-                                                                                         cumulative_examples))#, file=sys.stderr)
-
-                cum_loss = cumulative_examples = cumulative_tgt_words = 0.
-                valid_num += 1
-
-                print('begin validation ...')#, file=sys.stderr)
-
-                # compute dev. ppl and bleu
-                torch.no_grad()
-                model.eval()
-                dev_ppl = model.evaluate_ppl(dev_data, batch_size=128)   # dev batch size can be a bit larger
-                valid_metric = -dev_ppl
-
-                print('validation: iter %d, dev. ppl %f' % (train_iter, dev_ppl))#, file=sys.stderr)
-
-                is_better = len(hist_valid_scores) == 0 or valid_metric > max(hist_valid_scores)
-                hist_valid_scores.append(valid_metric)
+            train_time = time.time()
+            report_loss = report_tgt_words = report_examples = 0.
 
 
-                if is_better:
+
+
+        # the following code performs validation on dev set, and controls the learning schedule
+        # if the dev score is better than the last check point, then the current model is saved.
+        # otherwise, we allow for that performance degeneration for up to `--patience` times;
+        # if the dev score does not increase after `--patience` iterations, we reload the previously
+        # saved best model (and the state of the optimizer), halve the learning rate and continue
+        # training. This repeats for up to `--max-num-trial` times.
+        if train_iter % valid_niter == 0:
+            print('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
+                                                                                     cum_loss / cumulative_examples,
+                                                                                     np.exp(cum_loss / cumulative_tgt_words),
+                                                                                     cumulative_examples))#, file=sys.stderr)
+
+            cum_loss = cumulative_examples = cumulative_tgt_words = 0.
+            valid_num += 1
+
+            print('begin validation ...')#, file=sys.stderr)
+
+            # compute dev. ppl and bleu
+            torch.no_grad()
+            model.eval()
+            dev_ppl = model.evaluate_ppl(dev_data, batch_size=128)   # dev batch size can be a bit larger
+            valid_metric = -dev_ppl
+
+            print('validation: iter %d, dev. ppl %f' % (train_iter, dev_ppl))#, file=sys.stderr)
+
+            is_better = len(hist_valid_scores) == 0 or valid_metric > max(hist_valid_scores)
+            hist_valid_scores.append(valid_metric)
+
+
+            if is_better:
+                patience = 0
+                print('save currently the best model to [%s]' % model_save_path)#, file=sys.stderr)
+                #model.save(model_save_path)
+                torch.save(model.state_dict(), model_save_path)
+
+                # You may also save the optimizer's state
+            elif patience < int(args['--patience']):
+                patience += 1
+                print('hit patience %d' % patience)#, file=sys.stderr)
+
+                if patience == int(args['--patience']):
+                    num_trial += 1
+                    print('hit #%d trial' % num_trial)#, file=sys.stderr)
+                    if num_trial == int(args['--max-num-trial']):
+                        print('early stop!',)# file=sys.stderr)
+                        exit(0)
+
+                    # decay learning rate, and restore from previously best checkpoint
+                    scheduler.step()
+                    print("Modified learning rate...")
+                    print('loading previously best model and decaying learning rate')#, file=sys.stderr)
+                    for param_group in optimizer.param_groups:
+                        print("lr for param group =", param_group['lr'])
+
+
+                    # load model
+                    model.load_state_dict(torch.load(model_save_path))
+
+                    #print('restore parameters of the optimizers', file=sys.stderr)
+                    # You may also need to load the state of the optimizer saved before
+
+                    # reset patience
                     patience = 0
-                    print('save currently the best model to [%s]' % model_save_path)#, file=sys.stderr)
-                    #model.save(model_save_path)
-                    torch.save(model.state_dict(), model_save_path)
 
-                    # You may also save the optimizer's state
-                elif patience < int(args['--patience']):
-                    patience += 1
-                    print('hit patience %d' % patience)#, file=sys.stderr)
+            if epoch == int(args['--max-epoch']):
+                print('reached maximum number of epochs!')#, file=sys.stderr)
+                exit(0)
 
-                    if patience == int(args['--patience']):
-                        num_trial += 1
-                        print('hit #%d trial' % num_trial)#, file=sys.stderr)
-                        if num_trial == int(args['--max-num-trial']):
-                            print('early stop!',)# file=sys.stderr)
-                            exit(0)
-
-                        # decay learning rate, and restore from previously best checkpoint
-                        scheduler.step()
-                        print("Modified learning rate...")
-                        print('loading previously best model and decaying learning rate')#, file=sys.stderr)
-                        for param_group in optimizer.param_groups:
-                            print("lr for param group =", param_group['lr'])
-
-
-                        # load model
-                        model.load_state_dict(torch.load(model_save_path))
-
-                        #print('restore parameters of the optimizers', file=sys.stderr)
-                        # You may also need to load the state of the optimizer saved before
-
-                        # reset patience
-                        patience = 0
-
-                if epoch == int(args['--max-epoch']):
-                    print('reached maximum number of epochs!')#, file=sys.stderr)
-                    exit(0)
-            
     #         if train_iter % valid_niter == 0:
     #             print("running decoding on text")
     #             decode_epoch(args, epoch)
