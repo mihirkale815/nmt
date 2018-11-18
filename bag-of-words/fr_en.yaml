@@ -2,6 +2,7 @@ data: 'data/de-en_save'
 mono_data: 'data/de-en_save_mono'
 logF: 'experiments/'
 refF: 'nist08.tok.ref'
+use_mono: True
 epoch: 50
 batch_size: 64
 optim: 'adam'

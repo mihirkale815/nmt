@@ -43,14 +43,16 @@ def load_data():
     print('loading data...\n')
     datas = pickle.load(open(config.data+'data.pkl', 'rb'))
     datas['train']['length'] = int(datas['train']['length'] * opt.scale)
-
-    mono_datas = pickle.load(open(config.mono_data+'data.pkl', 'rb'))
-    mono_datas['train']['length'] = int(mono_datas['train']['length'] * opt.scale)
     
     bi_trainset = utils.BiDataset(datas['train'], char=config.char)
     bi_validset = utils.BiDataset(datas['test'], char=config.char)
 
-    mono_trainset = utils.MonoDataset(mono_datas['train'])
+    if config.use_mono:
+
+        mono_datas = pickle.load(open(config.mono_data+'data.pkl', 'rb'))
+        mono_datas['train']['length'] = int(mono_datas['train']['length'] * opt.scale)
+
+        mono_trainset = utils.MonoDataset(mono_datas['train'])
 
     # Just ensure Src_Vocab has both mono + bi vocab together in it. For now it has only Bi vocab
     
@@ -60,7 +62,13 @@ def load_data():
     config.tgt_vocab_size = tgt_vocab.size()
 
     # Given that mono is the majority, most of the samples seem to be mono for a particular batch... How to circumvent this??
-    trainset = torch.utils.data.ConcatDataset([bi_trainset,mono_trainset])
+    if config.use_mono:
+        print(" Using Monolingual and Parallel data")
+        trainset = torch.utils.data.ConcatDataset([bi_trainset,mono_trainset])
+    else:
+        print(" Using Parallel data only")
+        trainset = bi_trainset
+
     validset = bi_validset
 
     trainloader = torch.utils.data.DataLoader(dataset=trainset,
