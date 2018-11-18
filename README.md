@@ -2,7 +2,7 @@
 
 # Execution:
 
-To get set up, just run ``` sh run_scripts.sh```
+To get set up, just run ``` sh run_script.sh```
 
 # TO-DO
 
