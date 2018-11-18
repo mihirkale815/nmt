@@ -135,9 +135,6 @@ def train_model(model, datas, optim, epoch, params):
 
     for src, tgt, src_len, tgt_len, original_src, original_tgt, data_type in trainloader:
 
-        print(data_type)
-        s = input()
-
         model.zero_grad()
 
         src = Variable(src)

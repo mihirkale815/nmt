@@ -43,7 +43,7 @@ parser.add_argument('-report_every', type=int, default=100000,
 parser.add_argument('-data_folder', type=str, default="data",
                     help="Path to the FOLDER where all the data is")
 
-parser.add_argument('-mono', type=bool, default=False,
+parser.add_argument('-mono', type=int, default=0,
                     help="Flag is True for monolingual data")
 
 parser.add_argument('-vocab_path', type=str, default="de-en_savedata.pkl",
