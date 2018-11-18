@@ -1,11 +1,8 @@
-cp data/train.de-en.de data/combined_train.de-en.de
-cp data/train.de-en.en data/combined_train.de-en.en
-
 echo "Splitting source data into monolingual and subset for parallel corpora"
-python split_files.py data/combined_train.de-en.de data/train.de-en.de data/mono_train.de-en.de 10000
+python split_files.py data/original_train.de-en.de data/train.de-en.de data/mono_train.de-en.de 10000
 
 echo "Splitting target data only into corresponding parallel corpora component as source data"
-python split_files.py data/combined_train.de-en.en data/train.de-en.en data/mono_train.de-en.en 10000
+python split_files.py data/original_train.de-en.en data/train.de-en.en data/mono_train.de-en.en 10000
 
 echo "Create Vocabulary, Train, Test, Valid sets and dump as pickle"
 python preprocess.py \
