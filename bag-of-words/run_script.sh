@@ -30,4 +30,5 @@ echo "Starting Main Training Loop"
 python train.py \
 	-config="fr_en.yaml" \
 	-mode="train" \
+        -gpus=0 \
 

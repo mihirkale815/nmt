@@ -37,7 +37,7 @@ class seq2seq(nn.Module):
         self.multi_label_loss = nn.MultiLabelSoftMarginLoss(weight=weight, size_average=False)
 
     def one_hot(self, seq_batch, depth):
-        out = Variable(torch.zeros(seq_batch.size()+torch.Size([depth])))#.cuda()
+        out = Variable(torch.zeros(seq_batch.size()+torch.Size([depth]))).cuda()
         dim = len(seq_batch.size())
         index = seq_batch.view(seq_batch.size()+torch.Size([1]))
         return out.scatter_(dim, index, 1)

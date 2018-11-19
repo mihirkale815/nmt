@@ -29,7 +29,7 @@ def bleu(reference, candidate, log_path, print_log, config):
         ref_file = config.refF
 
     temp = log_path + "result.txt"
-    command = "perl script/multi-bleu.perl " + ref_file + "<" + cand_file + "> " + temp
+    command = "perl script/multi-bleu.perl " + ref_file + " < " + cand_file + " > " + temp
     os.system(command)
     with open(temp) as ft:
         result = ft.read()
