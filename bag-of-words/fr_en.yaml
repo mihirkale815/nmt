@@ -1,8 +1,8 @@
-data: 'data/de-en_save'
+data: 'data/en-gl_save'
 mono_data: 'data/de-en_save_mono'
 logF: 'experiments/'
 refF: 'nist08.tok.ref'
-use_mono: True
+use_mono: False
 epoch: 50
 batch_size: 64
 optim: 'adam'
@@ -12,10 +12,10 @@ learning_rate: 0.0003
 max_grad_norm: 1
 learning_rate_decay: 0.5
 start_decay_at: 8
-emb_size: 512
-hidden_size: 512
-dec_num_layers: 2
-enc_num_layers: 3
+emb_size: 256
+hidden_size: 256
+dec_num_layers: 1
+enc_num_layers: 1
 res_layers: 1
 bidirectional: True
 dropout: 0.15
