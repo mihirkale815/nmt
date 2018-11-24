@@ -121,8 +121,7 @@ class Dict(object):
             newDict.addSpecial(self.idxToLabel[i])
 
         for i in idx[:size]:
-            print(self.idxToLabel)
-            newDict.add(self.idxToLabel[i])
+            newDict.add(self.idxToLabel[int(i)])
 
         return newDict
 

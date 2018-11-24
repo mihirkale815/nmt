@@ -71,7 +71,6 @@ def makeVocabulary(filename, trun_length, filter_length, char, vocab, size):
                 vocab.add(word)
 
     print('Max length of %s = %d' % (filename, max_length))
-
     if size > 0:
         originalSize = vocab.size()
         vocab = vocab.prune(size)
@@ -256,21 +255,22 @@ def main():
 
     # This is used only for creating the vocabulary for the monolingual + parallel corpora
     combined_train_src = opt.data_folder +'combined_train.' + opt.load_data + "." + opt.src_suf
+    combined_train_tgt = opt.data_folder +'combined_train.' + opt.load_data + "." + opt.tgt_suf
 
     if not opt.mono:
         if opt.share:
                 assert opt.src_vocab_size == opt.tgt_vocab_size
                 print('Building source and target vocabulary...')
                 dicts['src'] = dicts['tgt'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
-                dicts['src'] = makeVocabulary(train_src, opt.src_trun, opt.src_filter, opt.src_char, dicts['src'], 0)
+                dicts['src'] = makeVocabulary(combined_train_src, opt.src_trun, opt.src_filter, opt.src_char, dicts['src'], 0)
                 dicts['src'] = dicts['tgt'] = makeVocabulary(train_tgt, opt.tgt_trun, opt.tgt_filter, opt.tgt_char, dicts['tgt'], opt.tgt_vocab_size)
         else:
                 print('Building source vocabulary...')
                 dicts['src'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
-                dicts['src'] = makeVocabulary(train_src, opt.src_trun, opt.src_filter, opt.src_char, dicts['src'], opt.src_vocab_size)
+                dicts['src'] = makeVocabulary(combined_train_src, opt.src_trun, opt.src_filter, opt.src_char, dicts['src'], opt.src_vocab_size)
                 print('Building target vocabulary...')
                 dicts['tgt'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
-                dicts['tgt'] = makeVocabulary(train_tgt, opt.tgt_trun, opt.tgt_filter, opt.tgt_char, dicts['tgt'], opt.tgt_vocab_size)
+                dicts['tgt'] = makeVocabulary(combined_train_tgt, opt.tgt_trun, opt.tgt_filter, opt.tgt_char, dicts['tgt'], opt.tgt_vocab_size)
 
 
         print('Preparing training ...')
@@ -298,8 +298,9 @@ def main():
         # Getting the vocabulary from Bi-dataset
         datas = pickle.load(open(opt.vocab_path, 'rb'))
         dicts['src'] = datas['dict']['src']
+        dicts['tgt'] = datas['dict']['tgt']
 
-        train = mono_makeData(train_src, dicts['src'], save_train_src)
+        train = makeData(train_src, train_tgt, dicts['src'], dicts['tgt'], save_train_src, save_train_tgt)
     
         datas = {'train': train, 'valid': {},
                  'test': {}, 'dict': dicts}

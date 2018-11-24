@@ -52,7 +52,7 @@ def load_data():
         mono_datas = pickle.load(open(config.mono_data+'data.pkl', 'rb'))
         mono_datas['train']['length'] = int(mono_datas['train']['length'] * opt.scale)
 
-        mono_trainset = utils.MonoDataset(mono_datas['train'])
+        mono_trainset = utils.BiDataset(mono_datas['train'], data_type="mono")
 
     # Just ensure Src_Vocab has both mono + bi vocab together in it. For now it has only Bi vocab
     
