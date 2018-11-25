@@ -68,7 +68,7 @@ class Dict(object):
 
     def getLabel(self, idx, default=None):
         try:
-            return self.idxToLabel[int(idx.cpu().data.numpy())]
+            return self.idxToLabel[idx]
         except KeyError:
             return default
 
@@ -121,8 +121,7 @@ class Dict(object):
             newDict.addSpecial(self.idxToLabel[i])
 
         for i in idx[:size]:
-            print(self.idxToLabel)
-            newDict.add(self.idxToLabel[i])
+            newDict.add(self.idxToLabel[int(i)])
 
         return newDict
 

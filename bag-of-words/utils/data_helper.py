@@ -34,6 +34,7 @@ class MonoDataset(torch_data.Dataset):
         original_src = linecache.getline(self.original_srcF, index+1).strip().split()
 
         return src, src, original_src, original_src, "mono"
+        return src, [], original_src, [], "mono"
 
     def __len__(self):
         return len(self.indexes)
@@ -41,7 +42,7 @@ class MonoDataset(torch_data.Dataset):
 
 class BiDataset(torch_data.Dataset):
 
-    def __init__(self, infos, indexes=None, char=False):
+    def __init__(self, infos, indexes=None, char=False, data_type="bi"):
 
         self.srcF = infos['srcF']
         self.tgtF = infos['tgtF']
@@ -50,6 +51,7 @@ class BiDataset(torch_data.Dataset):
         self.length = infos['length']
         self.infos = infos
         self.char = char
+        self.data_type = data_type
         if indexes is None:
             self.indexes = list(range(self.length))
         else:
@@ -63,11 +65,21 @@ class BiDataset(torch_data.Dataset):
         original_tgt = linecache.getline(self.original_tgtF, index+1).strip().split() if not self.char else \
                        list(linecache.getline(self.original_tgtF, index + 1).strip())
 
-        return src, tgt, original_src, original_tgt, "bi"
+        return src, tgt, original_src, original_tgt, self.data_type
 
     def __len__(self):
         return len(self.indexes)
 
+# def get_bilingual_dict(bi_dict_path):
+
+#     bilingual_dict = {}
+#     with open(bi_dict_path,"r") as fp:
+#         for line in fp:
+#             line = line.strip().split()
+#             bilingual_dict[line[0]] = bilingual_dict.get(line[0],[]) + [line[1]]
+#     print("Bilingual Dictionary Loaded!")
+
+#     return bilingual_dict
 
 def splitDataset(data_set, sizes):
     length = len(data_set)
@@ -87,6 +99,7 @@ def splitDataset(data_set, sizes):
 
 def padding(data):
     src, tgt, original_src, original_tgt, data_type = zip(*data)
+
     src_len = [len(s) for s in src]
     src_pad = torch.zeros(len(src), max(src_len)).long()
     for i, s in enumerate(src):
@@ -160,6 +173,7 @@ def split_padding(data):
                               torch.LongTensor(src_len), torch.LongTensor(tgt_len),
                               split_original_src, split_original_tgt])
 
+    return split_samples
     return split_samples
 
 

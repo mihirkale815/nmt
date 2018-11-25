@@ -21,8 +21,6 @@ import models
 import utils
 import codecs
 
-
-
 parser = argparse.ArgumentParser(description='train.py')
 opts.model_opts(parser)
 
@@ -54,7 +52,7 @@ def load_data():
         mono_datas = pickle.load(open(config.mono_data+'data.pkl', 'rb'))
         mono_datas['train']['length'] = int(mono_datas['train']['length'] * opt.scale)
 
-        mono_trainset = utils.MonoDataset(mono_datas['train'])
+        mono_trainset = utils.BiDataset(mono_datas['train'], data_type="mono")
 
     # Just ensure Src_Vocab has both mono + bi vocab together in it. For now it has only Bi vocab
     
@@ -68,9 +66,8 @@ def load_data():
         print(" Using Monolingual and Parallel data")
         trainset = torch.utils.data.ConcatDataset([bi_trainset,mono_trainset])
     else:
-        trainset = torch.utils.data.ConcatDataset([bi_trainset])
         print(" Using Parallel data only")
-
+        trainset = bi_trainset
 
     validset = bi_validset
 
