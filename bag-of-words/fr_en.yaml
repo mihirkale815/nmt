@@ -2,9 +2,9 @@ data: 'data/en-gl_save'
 mono_data: 'data/de-en_save_mono'
 logF: 'experiments/'
 refF: ''
-use_mono: False
+use_mono: True
 epoch: 50
-batch_size: 64
+batch_size: 8
 optim: 'adam'
 cell: 'lstm'
 attention: 'luong_gate'
@@ -20,7 +20,7 @@ res_layers: 1
 bidirectional: True
 dropout: 0.15
 max_time_step: 50
-eval_interval: 180
+eval_interval: 2
 save_interval: 1000
 metrics: ['bleu']
 shared_vocab: False

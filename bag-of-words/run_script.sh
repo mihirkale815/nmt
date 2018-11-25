@@ -6,7 +6,7 @@
 
 echo "Create Vocabulary, Train, Test, Valid sets and dump as pickle"
 python preprocess.py \
-	-mono=0 \
+	-mono=1 \
 	-data_folder="data/" \
 	-save_data="en-gl_save" \
 	-load_data="en-gl" \
@@ -30,5 +30,5 @@ echo "Starting Main Training Loop"
 python train.py \
 	-config="fr_en.yaml" \
 	-mode="train" \
-        -gpus=0 \
+    #    -gpus=0 \
 
