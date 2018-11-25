@@ -21,6 +21,8 @@ import models
 import utils
 import codecs
 
+
+
 parser = argparse.ArgumentParser(description='train.py')
 opts.model_opts(parser)
 
@@ -66,16 +68,22 @@ def load_data():
         print(" Using Monolingual and Parallel data")
         trainset = torch.utils.data.ConcatDataset([bi_trainset,mono_trainset])
     else:
+        trainset = torch.utils.data.ConcatDataset([bi_trainset])
         print(" Using Parallel data only")
-        trainset = bi_trainset
+
 
     validset = bi_validset
 
     trainloader = torch.utils.data.DataLoader(dataset=trainset,
-                                              batch_size=config.batch_size,
-                                              shuffle=True,
+                                              shuffle=False,
                                               num_workers=0,
-                                              collate_fn=utils.padding)
+                                              collate_fn=utils.padding,
+                                              batch_sampler=utils.TwoDatasetBatchSampler(trainset,config.batch_size))
+    '''trainloader = torch.utils.data.DataLoader(dataset=trainset,
+                                              batch_size=config.batch_size,
+                                              shuffle=False,
+                                              num_workers=0,
+                                              collate_fn=utils.padding)'''
     if hasattr(config, 'valid_batch_size'):
         valid_batch_size = config.valid_batch_size
     else:
@@ -143,6 +151,16 @@ def train_model(model, datas, optim, epoch, params):
 
     for src, tgt, src_len, tgt_len, original_src, original_tgt, data_type in trainloader:
 
+        if len(set(data_type)) > 1 :
+            raise Exception()
+        if len(data_type) != config.batch_size :
+            raise Exception()
+
+        data_type = data_type[0]
+
+        use_xent = True if data_type == 'bi' else False
+        use_label = True #if data_type == 'mono' else False
+
         model.zero_grad()
 
         src = Variable(src)
@@ -159,26 +177,17 @@ def train_model(model, datas, optim, epoch, params):
         targets = tgt[:, 1:]
 
         try:
-            if config.schesamp:
-                if epoch > 8:
-                    e = epoch - 8
-                    loss, outputs = model(src, lengths, dec, targets, teacher_ratio=0.9**e)
-                else:
-                    loss, outputs = model(src, lengths, dec, targets)
-            else:
-                loss, outputs = model(src, lengths, dec, targets, use_label = (epoch > config.offset))
-            pred = outputs.max(2)[1]
-            targets = targets.t()
-            num_correct = pred.data.eq(targets.data).masked_select(targets.ne(utils.PAD).data).sum()
+            loss, (outputs,bow_outputs) = \
+                    model(src, lengths, dec, targets, use_xent=use_xent, use_label = use_label)
+            pred = torch.gather(bow_outputs.data,1,targets)
+            num_correct = torch.sigmoid(pred.data).gt(0.5).masked_select(targets.ne(utils.PAD).data).sum()
             num_total = targets.ne(utils.PAD).data.sum()
             if config.max_split == 0:
                 mle_loss, label_loss = loss
                 params['mle_loss'] += torch.sum(mle_loss).data
-                if type(label_loss) == float:
-                    params['label_loss'] += label_loss
-                else:
-                    params['label_loss'] += label_loss.data
-                loss = (torch.sum(mle_loss) + min(max(0, config.alpha*(epoch-config.offset)), 1) * label_loss) / num_total.float()
+                params['label_loss'] += label_loss.data
+                #loss = (torch.sum(mle_loss) + min(max(0, config.alpha*(epoch-config.offset)), 1) * label_loss) / num_total.float()
+                loss = (torch.sum(mle_loss) + label_loss.sum()) / num_total.float()
                 loss.backward()
             optim.step()
 

@@ -9,6 +9,8 @@ import torch
 import torch.utils.data as torch_data
 from random import Random
 import utils
+from torch.utils.data.sampler import Sampler
+import random
 
 num_samples = 1
 
@@ -31,7 +33,7 @@ class MonoDataset(torch_data.Dataset):
         src = list(map(int, linecache.getline(self.srcF, index+1).strip().split()))
         original_src = linecache.getline(self.original_srcF, index+1).strip().split()
 
-        return src, [], original_src, [], "mono"
+        return src, src, original_src, original_src, "mono"
 
     def __len__(self):
         return len(self.indexes)
@@ -85,7 +87,6 @@ def splitDataset(data_set, sizes):
 
 def padding(data):
     src, tgt, original_src, original_tgt, data_type = zip(*data)
-
     src_len = [len(s) for s in src]
     src_pad = torch.zeros(len(src), max(src_len)).long()
     for i, s in enumerate(src):
@@ -160,3 +161,57 @@ def split_padding(data):
                               split_original_src, split_original_tgt])
 
     return split_samples
+
+
+
+class TwoDatasetBatchSampler(Sampler):
+    r"""Samples elements randomly. If without replacement, then sample from a shuffled dataset.
+    If with replacement, then user can specify ``num_samples`` to draw.
+    Arguments:
+        data_source (Dataset): dataset to sample from
+        num_samples (int): number of samples to draw, default=len(dataset)
+        replacement (bool): samples are drawn with replacement if ``True``, default=False
+    """
+
+    def __init__(self, data_source, batch_size,num_samples=None):
+        self.data_source = data_source
+        self.num_samples = num_samples
+        self.batch_size = batch_size
+
+
+        if self.num_samples is None:
+            self.num_samples = len(self.data_source)
+
+        self.set_indices()
+        self.drop_last = True
+
+
+    def set_indices(self):
+        n = len(self.data_source)
+        num_batches = int(n/float(self.batch_size))
+        batch_start_indices = [batch_num*self.batch_size for batch_num in range(0,num_batches)]
+        random.shuffle(batch_start_indices)
+        indices = [ idx for batch_start_idx in batch_start_indices for idx in range(batch_start_idx,
+                                                                                    batch_start_idx+self.batch_size)]
+        dataset1_size = self.data_source.cumulative_sizes[0]
+        self.indices_to_ignore = set([idx for idx in range(dataset1_size - dataset1_size%self.batch_size,dataset1_size)])
+        #indices = [idx for idx in indices if idx not in indices_to_ignore]
+        self.indices = indices
+
+    def __iter__(self):
+        batch = []
+        ctr = 0
+        for idx in self.indices:
+            ctr += 1
+            if idx not in self.indices_to_ignore : batch.append(idx)
+            if ctr == self.batch_size:
+                ctr = 0
+                yield batch
+                batch = []
+        if len(batch) > 0 and not self.drop_last:
+            yield batch
+
+    def __len__(self):
+        return len(self.data_source)
+
+

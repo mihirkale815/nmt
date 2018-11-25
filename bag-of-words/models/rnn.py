@@ -184,3 +184,23 @@ class StackedGRU(nn.Module):
         h_1 = torch.stack(h_1)
 
         return input, h_1
+
+
+class bow_decoder(nn.Module):
+
+    def __init__(self, config):
+        super(bow_decoder, self).__init__()
+
+        self.linear = nn.Linear(config.hidden_size, config.tgt_vocab_size)
+        self.hidden_size = config.hidden_size
+        self.config = config
+
+    def forward(self, contexts):
+        contexts = contexts.transpose(0,1) #maxlen,batch_size,emb_size => batch_size,maxlen,emb_size
+        context = torch.mean(contexts,dim=1)
+        output = self.compute_score(context)
+        return output
+
+    def compute_score(self, context):
+        scores = self.linear(context)
+        return scores

@@ -27,6 +27,8 @@ class seq2seq(nn.Module):
             self.decoder = decoder
         else:
             self.decoder = models.rnn_decoder(config, embedding=tgt_embedding, use_attention=use_attention)
+        self.bow_decoder = models.bow_decoder(config)
+        self.bow_decoder.linear.weight = self.decoder.linear.weight
         self.log_softmax = nn.LogSoftmax(dim=-1)
         self.softmax = nn.Softmax(dim=-1)
         self.use_cuda = config.use_cuda
@@ -37,7 +39,8 @@ class seq2seq(nn.Module):
         self.multi_label_loss = nn.MultiLabelSoftMarginLoss(weight=weight, size_average=False)
 
     def one_hot(self, seq_batch, depth):
-        out = Variable(torch.zeros(seq_batch.size()+torch.Size([depth]))).cuda()
+        out = Variable(torch.zeros(seq_batch.size()+torch.Size([depth])))
+        if self.use_cuda : out = out.cuda()
         dim = len(seq_batch.size())
         index = seq_batch.view(seq_batch.size()+torch.Size([1]))
         return out.scatter_(dim, index, 1)
@@ -50,16 +53,16 @@ class seq2seq(nn.Module):
 
     def compute_label_loss(self, scores, targets):
         targets = targets.contiguous()
-        mask = torch.ge(targets, 0).float()
-        mask_scores = mask.unsqueeze(-1) * scores
+        #mask = torch.ge(targets, 0).float()
+        #mask_scores = mask.unsqueeze(-1) * scores
 #        mask_scores = self.softmax(mask_scores)
-        sum_scores = mask_scores.sum(0)
+        #sum_scores = mask_scores.sum(0)
         labels = self.one_hot(targets, self.config.tgt_vocab_size).sum(0)
         labels = torch.ge(labels, 0).float()
-        label_loss = self.multi_label_loss(sum_scores, labels)
+        label_loss = self.multi_label_loss(scores, labels)
         return label_loss
 
-    def forward(self, src, src_len, dec, targets, use_label=False):
+    def forward(self, src, src_len, dec, targets, use_xent=False, use_label=False):
         src = src.t()
         dec = dec.t()
         targets = targets.t()
@@ -73,29 +76,25 @@ class seq2seq(nn.Module):
         if self.decoder.attention is not None:
             self.decoder.attention.init_context(context=contexts)
         outputs = []
-     #   if teacher:
-        for input in dec.split(1):
-            output, state, attn_weights, memory = self.decoder(input.squeeze(0), state, embeds, memory)
-            outputs.append(output)
-        outputs = torch.stack(outputs)
-        xent_loss = self.compute_xent_loss(outputs, targets)
-     #   else:
+        xent_loss, label_loss = torch.Tensor([0]), torch.Tensor([0])
+        if self.use_cuda :
+            xent_loss = xent_loss.cuda()
+            label_loss = label_loss.cuda()
+
+        if use_xent:
+            for input in dec.split(1):
+                output, state, attn_weights, memory = self.decoder(input.squeeze(0), state, embeds, memory)
+                outputs.append(output)
+            outputs = torch.stack(outputs)
+            xent_loss = self.compute_xent_loss(outputs, targets)
+
         if use_label:
-            #label_outputs = []
-            #inputs = [dec.split(1)[0].squeeze(0)]
-            #for i, _ in enumerate(dec.split(1)):
-            #    output, state, attn_weights, memory = self.decoder(inputs[i], state, embeds, memory)
-            #    predicted = output.max(1)[1]
-            #    inputs += [predicted]
-            #    label_outputs.append(output)
-            #label_outputs = torch.stack(label_outputs)
-            #label_loss = self.compute_label_loss(label_outputs, targets)
-            label_loss = self.compute_label_loss(outputs, targets)
-            loss = (xent_loss, label_loss)
-        else:
-            loss = (xent_loss, 0.0)
-  #      loss = self.compute_loss(outputs, targets)
-        return loss, outputs
+            bow_outputs = self.bow_decoder(contexts)
+            label_loss = self.compute_label_loss(bow_outputs, targets)
+
+
+        loss = (xent_loss, label_loss)
+        return loss, (outputs,bow_outputs)
 
     def sample(self, src, src_len):
 
