@@ -173,7 +173,7 @@ def split_padding(data):
                               torch.LongTensor(src_len), torch.LongTensor(tgt_len),
                               split_original_src, split_original_tgt])
 
-    return split_samples
+
     return split_samples
 
 
@@ -207,7 +207,9 @@ class TwoDatasetBatchSampler(Sampler):
         random.shuffle(batch_start_indices)
         indices = [ idx for batch_start_idx in batch_start_indices for idx in range(batch_start_idx,
                                                                                     batch_start_idx+self.batch_size)]
-        dataset1_size = self.data_source.cumulative_sizes[0]
+        dataset1_size = self.data_source.cumulative_sizes[0] \
+            if type(self.data_source) == torch.utils.data.ConcatDataset\
+            else len(self.data_source)
         self.indices_to_ignore = set([idx for idx in range(dataset1_size - dataset1_size%self.batch_size,dataset1_size)])
         #indices = [idx for idx in indices if idx not in indices_to_ignore]
         self.indices = indices
