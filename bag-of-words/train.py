@@ -148,8 +148,6 @@ def train_model(model, datas, optim, epoch, params):
 
     for src, tgt, src_len, tgt_len, original_src, original_tgt, data_type in trainloader:
 
-        if len(set(data_type)) > 1 :
-            raise Exception()
         if len(data_type) != config.batch_size :
             raise Exception()
 
