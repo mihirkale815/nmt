@@ -28,7 +28,7 @@ class seq2seq(nn.Module):
         else:
             self.decoder = models.rnn_decoder(config, embedding=tgt_embedding, use_attention=use_attention)
         self.bow_decoder = models.bow_decoder(config)
-        self.bow_decoder.linear.weight = self.decoder.linear.weight
+        #self.bow_decoder.linear.weight = self.decoder.linear.weight
         self.log_softmax = nn.LogSoftmax(dim=-1)
         self.softmax = nn.Softmax(dim=-1)
         self.use_cuda = config.use_cuda
