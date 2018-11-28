@@ -16,7 +16,6 @@ cat train.de-en.en train.bidict.2.de-en.en > combined_train.bow.2.de-en.en
 cat train.de-en.de train.mono.4.de-en.de > combined_train.bow.4.de-en.de
 cat train.de-en.en train.bidict.4.de-en.en > combined_train.bow.4.de-en.en
 
-
 cat train.de-en.de train.bidict.1.de-en.de > combined_train.wow.1.de-en.de
 cat train.de-en.en train.mono.1.de-en.en > combined_train.wow.1.de-en.en
 
