@@ -41,7 +41,7 @@ if use_cuda:
 
 def load_data():
     print('loading data...\n')
-    datas = pickle.load(open(config.data+'data.pkl', 'rb'))
+    datas = pickle.load(open('data/save_data.pkl', 'rb'))
     datas['train']['length'] = int(datas['train']['length'] * opt.scale)
     
     bi_trainset = utils.BiDataset(datas['train'], char=config.char)
@@ -49,7 +49,7 @@ def load_data():
 
     if config.use_mono:
 
-        mono_datas = pickle.load(open(config.mono_data+'data.pkl', 'rb'))
+        mono_datas = pickle.load(open('data/save_mono_data.pkl', 'rb'))
         mono_datas['train']['length'] = int(mono_datas['train']['length'] * opt.scale)
 
         mono_trainset = utils.BiDataset(mono_datas['train'], data_type="mono")
@@ -203,7 +203,7 @@ def train_model(model, datas, optim, epoch, params):
 
         if params['updates'] % config.eval_interval == 0:
             params['log']("epoch: %3d, loss: %6f, mle_loss: %6f, label_loss: %6f, time: %6.3f, updates: %8d, accuracy: %2.2f\n"
-                          % (epoch, params['report_loss'], params['mle_loss'], params['label_loss'], time.time()-params['report_time'],
+                          % (epoch, params['report_loss'].sum(), params['mle_loss'].sum(), params['label_loss'].sum(), time.time()-params['report_time'],
                              params['updates'], params['report_correct'] * 100.0 / params['report_total']))
             print('evaluating after %d updates...\r' % params['updates'])
             score = eval_model(model, datas, params)

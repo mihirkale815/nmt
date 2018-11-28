@@ -10,12 +10,8 @@ import pickle
 
 parser = argparse.ArgumentParser(description='preprocess.py')
 
-parser.add_argument('-load_data', required=True,
-                    help="input file for the data")
-
-parser.add_argument('-save_data', required=True,
-                    help="Output file for the prepared data")
-
+parser.add_argument('-id', required=True,
+                    help="id of experiment setup")
 parser.add_argument('-src_vocab_size', type=int, default=50000,
                     help="Size of the source vocabulary")
 parser.add_argument('-tgt_vocab_size', type=int, default=50000,
@@ -28,29 +24,42 @@ parser.add_argument('-src_trun', type=int, default=0,
                     help="Truncate source sequence length")
 parser.add_argument('-tgt_trun', type=int, default=0,
                     help="Truncate target sequence length")
-parser.add_argument('-mult', type=str, help='multiplier', default='')
-parser.add_argument('-src_char', action='store_true', help='character based encoding')
-parser.add_argument('-tgt_char', action='store_true', help='character based decoding')
-parser.add_argument('-src_suf', default='src',
-                    help="the suffix of the source filename")
-parser.add_argument('-tgt_suf', default='tgt',
-                    help="the suffix of the target filename")
-
-parser.add_argument('-share', action='store_true', help='share the vocabulary between source and target')
-
 parser.add_argument('-report_every', type=int, default=100000,
                     help="Report status every this many sentences")
-
-parser.add_argument('-data_folder', type=str, default="data",
-                    help="Path to the FOLDER where all the data is")
-
-parser.add_argument('-mono', type=int, default=0,
-                    help="Flag is True for monolingual data")
-
-parser.add_argument('-vocab_path', type=str, default="de-en_savedata.pkl",
+parser.add_argument('-vocab_path', type=str, default="save_data.pkl",
                     help="path to pickle of bilingual source vocabulary")
-
 opt = parser.parse_args()
+
+
+file_config = {}
+
+file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de', 'train.de-en.en', '',
+                           'combined_train.bow.0.de-en.en','valid.de-en.de','valid.de-en.de','test.de-en.de',
+                           'test.de-en.en']
+
+file_config['bow_1'] = ['train.de-en.de', 'train.mono.1.de-en.de', 'combined_train.bow.1.de-en.de', 'train.de-en.en',
+                        'train.bidict.1.de-en.en', 'combined_train.bow.1.de-en.en','valid.de-en.de','valid.de-en.de',
+                        'test.de-en.de','test.de-en.en']
+
+file_config['bow_2'] = ['train.de-en.de', 'train.mono.2.de-en.de', 'combined_train.bow.2.de-en.de', 'train.de-en.en',
+                        'train.bidict.2.de-en.en', 'combined_train.bow.2.de-en.en','valid.de-en.de','valid.de-en.de',
+                        'test.de-en.de','test.de-en.en']
+
+file_config['bow_4'] = ['train.de-en.de', 'train.mono.4.de-en.de', 'combined_train.bow.4.de-en.de', 'train.de-en.en',
+                        'train.bidict.4.de-en.en', 'combined_train.bow.4.de-en.en','valid.de-en.de','valid.de-en.de',
+                        'test.de-en.de','test.de-en.en']
+
+file_config['wow_1'] = ['train.de-en.de', 'train.bidict.1.de-en.de', 'combined_train.wow.1.de-en.de',
+                        'train.de-en.en', 'train.mono.1.de-en.en', 'combined_train.wow.1.de-en.en','valid.de-en.de',
+                        'valid.de-en.de','test.de-en.de','test.de-en.en']
+
+file_config['wow_2'] = ['train.de-en.de', 'train.bidict.2.de-en.de', 'combined_train.wow.2.de-en.de',
+                        'train.de-en.en', 'train.mono.2.de-en.en', 'combined_train.wow.2.de-en.en','valid.de-en.de',
+                        'valid.de-en.de','test.de-en.de','test.de-en.en']
+
+file_config['wow_4'] = ['train.de-en.de', 'train.bidict.4.de-en.de', 'combined_train.wow.4.de-en.de',
+                        'train.de-en.en', 'train.mono.4.de-en.en', 'combined_train.wow.4.de-en.en','valid.de-en.de',
+                        'valid.de-en.de','test.de-en.de','test.de-en.en']
 
 
 def makeVocabulary(filename, trun_length, filter_length, char, vocab, size):
@@ -84,7 +93,6 @@ def makeVocabulary(filename, trun_length, filter_length, char, vocab, size):
 def saveVocabulary(name, vocab, file):
     print('Saving ' + name + ' vocabulary to \'' + file + '\'...')
     vocab.writeFile(file)
-
 
 def makeData(srcFile, tgtFile, srcDicts, tgtDicts, save_srcFile, save_tgtFile, lim=0):
     sizes = 0
@@ -124,8 +132,8 @@ def makeData(srcFile, tgtFile, srcDicts, tgtDicts, save_srcFile, save_tgtFile, l
         sline = sline.lower()
         tline = tline.lower()
 
-        srcWords = sline.split() if not opt.src_char else list(sline)
-        tgtWords = tline.split() if not opt.tgt_char else list(tline)
+        srcWords = sline.split()
+        tgtWords = tline.split()
 
 
         if (opt.src_filter == 0 or len(sline.split()) <= opt.src_filter) and \
@@ -141,14 +149,11 @@ def makeData(srcFile, tgtFile, srcDicts, tgtDicts, save_srcFile, save_tgtFile, l
 
             srcIdF.write(" ".join(list(map(str, srcIds)))+'\n')
             tgtIdF.write(" ".join(list(map(str, tgtIds)))+'\n')
-            if not opt.src_char:
-                srcStrF.write(" ".join(srcWords)+'\n')
-            else:
-                srcStrF.write("".join(srcWords) + '\n')
-            if not opt.tgt_char:
-                tgtStrF.write(" ".join(tgtWords)+'\n')
-            else:
-                tgtStrF.write("".join(tgtWords) + '\n')
+
+            srcStrF.write(" ".join(srcWords)+'\n')
+            tgtStrF.write(" ".join(tgtWords)+'\n')
+
+
 
             sizes += 1
         else:
@@ -203,7 +208,7 @@ def mono_makeData(srcFile, srcDicts, save_srcFile, lim=0):
 
         sline = sline.lower()
 
-        srcWords = sline.split() if not opt.src_char else list(sline)
+        srcWords = sline.split()
 
 
         if (opt.src_filter == 0 or len(sline.split()) <= opt.src_filter):
@@ -214,10 +219,9 @@ def mono_makeData(srcFile, srcDicts, save_srcFile, lim=0):
             srcIds = srcDicts.convertToIdx(srcWords, utils.UNK_WORD)
 
             srcIdF.write(" ".join(list(map(str, srcIds)))+'\n')
-            if not opt.src_char:
-                srcStrF.write(" ".join(srcWords)+'\n')
-            else:
-                srcStrF.write("".join(srcWords) + '\n')
+
+            srcStrF.write(" ".join(srcWords)+'\n')
+
 
             sizes += 1
         else:
@@ -244,60 +248,66 @@ def main():
 
     dicts = {}
 
-    train_src, train_tgt = opt.data_folder + 'train.' + opt.load_data + "." + opt.src_suf, opt.data_folder +'train.' + opt.load_data + "." + opt.tgt_suf
-    valid_src, valid_tgt = opt.data_folder + 'valid.' + opt.load_data + "." + opt.src_suf, opt.data_folder +'valid.' + opt.load_data + "." + opt.tgt_suf
-    test_src, test_tgt = opt.data_folder + 'test.' + opt.load_data + "." + opt.src_suf, opt.data_folder +'test.' + opt.load_data + "." + opt.tgt_suf
+    train_src, train_mono_src, combined_train_src, \
+    train_tgt, train_mono_tgt, combined_train_tgt,  \
+    valid_src, valid_tgt, \
+    test_src, test_tgt  = file_config[opt.id]
 
-    save_train_src, save_train_tgt = opt.data_folder +'train.' + opt.save_data + "." + opt.src_suf, opt.data_folder +'train.' + opt.save_data + "." + opt.tgt_suf
-    save_valid_src, save_valid_tgt = opt.data_folder +'valid.' + opt.save_data+ "." + opt.src_suf, opt.data_folder +'valid.' + opt.save_data + "." + opt.tgt_suf
-    save_test_src, save_test_tgt = opt.data_folder +'test.' + opt.save_data + "." + opt.src_suf, opt.data_folder +'test.' + opt.save_data + "." + opt.tgt_suf
+    train_src = "data/" + train_src
+    train_mono_src = "data/" + train_mono_src
 
-    src_dict, tgt_dict = opt.data_folder +opt.save_data + '.src.dict', opt.data_folder +opt.save_data + '.tgt.dict'
+    train_tgt = "data/" + train_tgt
+    train_mono_tgt = "data/" + train_mono_tgt
 
-    # This is used only for creating the vocabulary for the monolingual + parallel corpora
-    combined_train_src = opt.data_folder +'combined_train.' + opt.mult + "." +  opt.load_data + "." + opt.src_suf
-    combined_train_tgt = opt.data_folder +'combined_train.' + opt.mult + "." +  opt.load_data + "." + opt.tgt_suf
+    combined_train_src = "data/" + combined_train_src
+    combined_train_tgt = "data/" + combined_train_tgt
 
-    if not opt.mono:
-        if opt.share:
-                assert opt.src_vocab_size == opt.tgt_vocab_size
-                print('Building source and target vocabulary...')
-                dicts['src'] = dicts['tgt'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
-                dicts['src'] = makeVocabulary(combined_train_src, opt.src_trun, opt.src_filter, opt.src_char, dicts['src'], 0)
-                dicts['src'] = dicts['tgt'] = makeVocabulary(train_tgt, opt.tgt_trun, opt.tgt_filter, opt.tgt_char, dicts['tgt'], opt.tgt_vocab_size)
-        else:
-                print('Building source vocabulary...')
-                dicts['src'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
-                dicts['src'] = makeVocabulary(combined_train_src, opt.src_trun, opt.src_filter, opt.src_char, dicts['src'], opt.src_vocab_size)
-                print('Building target vocabulary...')
-                dicts['tgt'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
-                dicts['tgt'] = makeVocabulary(combined_train_tgt, opt.tgt_trun, opt.tgt_filter, opt.tgt_char, dicts['tgt'], opt.tgt_vocab_size)
+    valid_src = "data/" + valid_src
+    valid_tgt = "data/" + valid_tgt
+
+    test_src = "data/" + test_src
+    test_tgt = "data/" + test_tgt
+
+    save_train_src, save_train_tgt = train_src + ".save", train_tgt + ".save"
+    save_valid_src, save_valid_tgt = valid_src + ".save", valid_tgt + ".save"
+    save_test_src, save_test_tgt = test_src + ".save", test_tgt + ".save"
+    src_dict, tgt_dict = "save" + '.src.dict', "save" + '.tgt.dict'
 
 
-        print('Preparing training ...')
-        train = makeData(train_src, train_tgt, dicts['src'], dicts['tgt'], save_train_src, save_train_tgt)
-    
-        print('Preparing validation ...')
-        valid = makeData(valid_src, valid_tgt, dicts['src'], dicts['tgt'], save_valid_src, save_valid_tgt)
 
-        print('Preparing test ...')
-        test = makeData(test_src, test_tgt, dicts['src'], dicts['tgt'], save_test_src, save_test_tgt)
 
-        print('Saving source vocabulary to \'' + src_dict + '\'...')
-        dicts['src'].writeFile(src_dict)
+    print('Building source vocabulary...')
+    dicts['src'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
+    dicts['src'] = makeVocabulary(combined_train_src, opt.src_trun, opt.src_filter, False, dicts['src'], opt.src_vocab_size)
+    print('Building target vocabulary...')
+    dicts['tgt'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
+    dicts['tgt'] = makeVocabulary(combined_train_tgt, opt.tgt_trun, opt.tgt_filter, False, dicts['tgt'], opt.tgt_vocab_size)
 
-        print('Saving target vocabulary to \'' + tgt_dict + '\'...')
-        dicts['tgt'].writeFile(tgt_dict)
 
-        datas = {'train': train, 'valid': valid,
-                 'test': test, 'dict': dicts}
-        pickle.dump(datas, open(opt.data_folder+opt.save_data+'data.pkl', 'wb'))
+    print('Preparing training ...')
+    train = makeData(train_src, train_tgt, dicts['src'], dicts['tgt'], save_train_src, save_train_tgt)
 
-    else:
-        print('Preparing training ...')
+    print('Preparing validation ...')
+    valid = makeData(valid_src, valid_tgt, dicts['src'], dicts['tgt'], save_valid_src, save_valid_tgt)
+
+    print('Preparing test ...')
+    test = makeData(test_src, test_tgt, dicts['src'], dicts['tgt'], save_test_src, save_test_tgt)
+
+    print('Saving source vocabulary to \'' + src_dict + '\'...')
+    dicts['src'].writeFile(src_dict)
+
+    print('Saving target vocabulary to \'' + tgt_dict + '\'...')
+    dicts['tgt'].writeFile(tgt_dict)
+
+    datas = {'train': train, 'valid': valid,
+             'test': test, 'dict': dicts}
+    pickle.dump(datas, open('data/save_data.pkl', 'wb'))
+
+    if train_mono_src!= ''  and train_mono_tgt!= '' :
+        print('Preparing mono training ...')
 
         # Getting the vocabulary from Bi-dataset
-        datas = pickle.load(open(opt.vocab_path, 'rb'))
+        datas = pickle.load(open("data/"+opt.vocab_path, 'rb'))
         dicts['src'] = datas['dict']['src']
         dicts['tgt'] = datas['dict']['tgt']
 
@@ -305,7 +315,7 @@ def main():
     
         datas = {'train': train, 'valid': {},
                  'test': {}, 'dict': dicts}
-        pickle.dump(datas, open(opt.data_folder+opt.save_data+'data.pkl', 'wb'))
+        pickle.dump(datas, open('data/save_mono_data.pkl', 'wb'))
 
 
 if __name__ == "__main__":

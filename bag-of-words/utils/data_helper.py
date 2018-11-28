@@ -56,6 +56,7 @@ class BiDataset(torch_data.Dataset):
             self.indexes = list(range(self.length))
         else:
             self.indexes = indexes
+        print(infos)
 
     def __getitem__(self, index):
         index = self.indexes[index]
