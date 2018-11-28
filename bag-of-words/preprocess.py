@@ -28,6 +28,7 @@ parser.add_argument('-src_trun', type=int, default=0,
                     help="Truncate source sequence length")
 parser.add_argument('-tgt_trun', type=int, default=0,
                     help="Truncate target sequence length")
+parser.add_argument('-mult', type=str, help='multiplier', default='')
 parser.add_argument('-src_char', action='store_true', help='character based encoding')
 parser.add_argument('-tgt_char', action='store_true', help='character based decoding')
 parser.add_argument('-src_suf', default='src',
@@ -254,8 +255,8 @@ def main():
     src_dict, tgt_dict = opt.data_folder +opt.save_data + '.src.dict', opt.data_folder +opt.save_data + '.tgt.dict'
 
     # This is used only for creating the vocabulary for the monolingual + parallel corpora
-    combined_train_src = opt.data_folder +'combined_train.' + opt.load_data + "." + opt.src_suf
-    combined_train_tgt = opt.data_folder +'combined_train.' + opt.load_data + "." + opt.tgt_suf
+    combined_train_src = opt.data_folder +'combined_train.' + opt.mult + "." +  opt.load_data + "." + opt.src_suf
+    combined_train_tgt = opt.data_folder +'combined_train.' + opt.mult + "." +  opt.load_data + "." + opt.tgt_suf
 
     if not opt.mono:
         if opt.share:

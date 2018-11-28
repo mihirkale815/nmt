@@ -35,8 +35,8 @@ class seq2seq(nn.Module):
         self.config = config
         weight = torch.ones(config.tgt_vocab_size)
         weight[0] = 0
-        self.criterion = nn.CrossEntropyLoss(ignore_index=utils.PAD, reduce=False)
-        self.multi_label_loss = nn.MultiLabelSoftMarginLoss(weight=weight, size_average=False)
+        self.criterion = nn.CrossEntropyLoss(ignore_index=utils.PAD, reduction='none')
+        self.multi_label_loss = nn.MultiLabelSoftMarginLoss(weight=weight, reduction='none')
 
     def one_hot(self, seq_batch, depth):
         out = Variable(torch.zeros(seq_batch.size()+torch.Size([depth])))
@@ -87,10 +87,10 @@ class seq2seq(nn.Module):
                 outputs.append(output)
             outputs = torch.stack(outputs)
             xent_loss = self.compute_xent_loss(outputs, targets)
-
         if use_label:
             bow_outputs = self.bow_decoder(contexts)
-            label_loss = self.compute_label_loss(bow_outputs, targets)
+            #label_loss = self.compute_label_loss(bow_outputs, targets)
+            label_loss = self.compute_label_loss(outputs.sum(0), targets)
 
 
         loss = (xent_loss, label_loss)
