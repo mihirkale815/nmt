@@ -1,5 +1,5 @@
 logF: 'experiments/'
-refF: 'data/test.de-en.en'
+refF: 'data/train.mono.1.de-en.de'
 use_mono: False
 epoch: 50
 batch_size: 4
