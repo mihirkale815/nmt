@@ -38,24 +38,24 @@ file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de'
                            'test.de-en.en']
 
 file_config['bow_1'] = ['train.de-en.de', 'train.mono.1.de-en.de', 'combined_train.bow.1.de-en.de', 'train.de-en.en',
-                        'train.bidict.1.de-en.en', 'combined_train.bow.1.de-en.en','valid.de-en.de','valid.de-en.de',
+                        'train.bidict.1.de-en.en', 'combined_train.bow.1.de-en.en','valid.de-en.de','valid.de-en.en',
                         'test.de-en.de','test.de-en.en']
 
 file_config['bow_2'] = ['train.de-en.de', 'train.mono.2.de-en.de', 'combined_train.bow.2.de-en.de', 'train.de-en.en',
-                        'train.bidict.2.de-en.en', 'combined_train.bow.2.de-en.en','valid.de-en.de','valid.de-en.de',
+                        'train.bidict.2.de-en.en', 'combined_train.bow.2.de-en.en','valid.de-en.de','valid.de-en.en',
                         'test.de-en.de','test.de-en.en']
 
 file_config['bow_4'] = ['train.de-en.de', 'train.mono.4.de-en.de', 'combined_train.bow.4.de-en.de', 'train.de-en.en',
-                        'train.bidict.4.de-en.en', 'combined_train.bow.4.de-en.en','valid.de-en.de','valid.de-en.de',
+                        'train.bidict.4.de-en.en', 'combined_train.bow.4.de-en.en','valid.de-en.de','valid.de-en.en',
                         'test.de-en.de','test.de-en.en']
 
 file_config['wow_1'] = ['train.de-en.de', 'train.bidict.1.de-en.de', 'combined_train.wow.1.de-en.de',
                         'train.de-en.en', 'train.mono.1.de-en.en', 'combined_train.wow.1.de-en.en','valid.de-en.de',
-                        'valid.de-en.de','test.de-en.de','test.de-en.en']
+                        'valid.de-en.en','test.de-en.de','test.de-en.en']
 
 file_config['wow_2'] = ['train.de-en.de', 'train.bidict.2.de-en.de', 'combined_train.wow.2.de-en.de',
                         'train.de-en.en', 'train.mono.2.de-en.en', 'combined_train.wow.2.de-en.en','valid.de-en.de',
-                        'valid.de-en.de','test.de-en.de','test.de-en.en']
+                        'valid.de-en.en','test.de-en.de','test.de-en.en']
 
 file_config['wow_4'] = ['train.de-en.de', 'train.bidict.4.de-en.de', 'combined_train.wow.4.de-en.de',
                         'train.de-en.en', 'train.mono.4.de-en.en', 'combined_train.wow.4.de-en.en','valid.de-en.de',

@@ -60,6 +60,8 @@ def load_data():
     tgt_vocab = datas['dict']['tgt']
     config.src_vocab_size = src_vocab.size()
     config.tgt_vocab_size = tgt_vocab.size()
+    config.src_vocab = src_vocab.labelToIdx
+    config.tgt_vocab = tgt_vocab.labelToIdx
 
     # Given that mono is the majority, most of the samples seem to be mono for a particular batch... How to circumvent this??
     if config.use_mono:
@@ -133,6 +135,7 @@ def build_model(checkpoints, print_log):
     for param in model.parameters():
         param_count += param.view(-1).size()[0]
     for k, v in config.items():
+        if type(v) == dict : continue
         print_log("%s:\t%s\n" % (str(k), str(v)))
     print_log("\n")
     print_log(repr(model) + "\n\n")
