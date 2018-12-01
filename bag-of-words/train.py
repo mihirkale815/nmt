@@ -305,7 +305,7 @@ def build_log():
         log_path = config.logF + opt.log + '/'
     if not os.path.exists(log_path):
         os.mkdir(log_path)
-    print_log = utils.print_log(log_path + 'log.txt')
+    print_log = utils.print_log(log_path + 'wow1_new_log.txt')
     return print_log, log_path
 
 

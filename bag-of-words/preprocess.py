@@ -262,10 +262,15 @@ def main():
     test_src, test_tgt  = file_config[opt.id]
 
     train_src = "data/" + train_src
-    train_mono_src = "data/" + train_mono_src
+    if train_mono_src!='':
+        train_mono_src = "data/" + train_mono_src
+        train_mono_tgt = "data/" + train_mono_tgt
+    else:
+        train_mono_src = ''
+        train_mono_tgt = ''
 
     train_tgt = "data/" + train_tgt
-    train_mono_tgt = "data/" + train_mono_tgt
+    #train_mono_tgt = "data/" + train_mono_tgt
 
     combined_train_src = "data/" + combined_train_src
     combined_train_tgt = "data/" + combined_train_tgt

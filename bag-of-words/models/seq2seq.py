@@ -73,7 +73,7 @@ class seq2seq(nn.Module):
             self.decoder = decoder
         else:
             self.decoder = models.rnn_decoder(config, embedding=tgt_embedding, use_attention=use_attention)
-        if config.emb == 'fasttext':
+        if config.emb == 'fasttext': 
             src_embedding = create_embed_matrix(config.src_emb_file_path,config.src_vocab)
             self.encoder.embedding.weight.data.copy_(torch.from_numpy(src_embedding))
             tgt_embedding = create_embed_matrix(config.tgt_emb_file_path,config.tgt_vocab)
@@ -140,8 +140,8 @@ class seq2seq(nn.Module):
             xent_loss = self.compute_xent_loss(outputs, targets)
         if use_label:
             bow_outputs = self.bow_decoder(contexts)
-            #label_loss = self.compute_label_loss(bow_outputs, targets)
-            label_loss = self.compute_label_loss(outputs.sum(0), targets)
+            label_loss = self.compute_label_loss(bow_outputs, targets)
+            #label_loss = self.compute_label_loss(outputs.sum(0), targets)
 
 
         loss = (xent_loss, label_loss)
