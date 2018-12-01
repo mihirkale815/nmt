@@ -11,7 +11,53 @@ from torch.autograd import Variable
 import utils
 import models
 import random
+import numpy as np
 
+def isFloat(x):
+    try:
+        float(x)
+        return True
+    except:
+        return False
+
+
+def create_embed_matrix(file_path, word2id):
+
+    embedding_dim = 300
+    vocab_size = len(word2id)
+    print(vocab_size, 'vocab size')
+    embeddings_index = {}
+    f = open(file_path)
+    i = 0
+
+    for line_no,line in enumerate(f):
+        if line_no%100000 == 0 :
+            print("processed",line_no,"embeddings")
+        values = line.split()
+        if len(values) < 3:
+            continue
+        i += 1
+        num_words = 0
+        for j in range(len(values)):
+            if isFloat(values[j]):
+                break
+            else:
+                num_words += 1
+
+        coefs = np.asarray(values[num_words:], dtype='float32')
+        for idx in range(num_words):
+            embeddings_index[values[idx]] = coefs
+    print('done reading embedding file')
+
+    num_embeddings_found = 0
+    embedding_matrix = np.zeros((vocab_size, embedding_dim))
+    for word in word2id:
+        embedding_vector = embeddings_index.get(word)
+        if embedding_vector is not None:
+            num_embeddings_found+=1
+            embedding_matrix[word2id[word]] = embedding_vector
+    print("Number of words with embeddings = ",num_embeddings_found)
+    return embedding_matrix
 
 class seq2seq(nn.Module):
 
@@ -27,6 +73,11 @@ class seq2seq(nn.Module):
             self.decoder = decoder
         else:
             self.decoder = models.rnn_decoder(config, embedding=tgt_embedding, use_attention=use_attention)
+        if config.emb == 'fasttext':
+            src_embedding = create_embed_matrix(config.src_emb_file_path,config.src_vocab)
+            self.encoder.embedding.weight.data.copy_(torch.from_numpy(src_embedding))
+            tgt_embedding = create_embed_matrix(config.tgt_emb_file_path,config.tgt_vocab)
+            self.decoder.embedding.weight.data.copy_(torch.from_numpy(tgt_embedding))
         self.bow_decoder = models.bow_decoder(config)
         #self.bow_decoder.linear.weight = self.decoder.linear.weight
         self.log_softmax = nn.LogSoftmax(dim=-1)

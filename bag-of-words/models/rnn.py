@@ -192,6 +192,7 @@ class bow_decoder(nn.Module):
         super(bow_decoder, self).__init__()
 
         self.linear = nn.Linear(config.hidden_size, config.tgt_vocab_size)
+        self.proj = nn.Linear(config.hidden_size, config.hidden_size)
         self.hidden_size = config.hidden_size
         self.config = config
 
@@ -202,5 +203,5 @@ class bow_decoder(nn.Module):
         return output
 
     def compute_score(self, context):
-        scores = self.linear(context)
+        scores = self.linear(torch.nn.Tanh()(self.proj(context)))
         return scores
