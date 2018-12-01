@@ -34,8 +34,16 @@ opt = parser.parse_args()
 file_config = {}
 
 file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de', 'train.de-en.en', '',
-                           'combined_train.bow.0.de-en.en','valid.de-en.de','valid.de-en.de','test.de-en.de',
+                           'combined_train.bow.0.de-en.en', 'valid.de-en.de','valid.de-en.de', 'test.de-en.de',
                            'test.de-en.en']
+
+file_config['reverse_baseline'] = ['train.de-en.en', '', 'combined_train.bow.0.de-en.en', 'train.de-en.de', '',
+                           'combined_train.bow.0.de-en.de', 'valid.de-en.en', 'valid.de-en.en', 'test.de-en.en',
+                           'test.de-en.de']
+
+file_config['test_mono'] = ['train.de-en.en', '', 'combined_train.bow.0.de-en.en', 'train.de-en.de', '',
+                           'combined_train.bow.0.de-en.de', 'train.mono.1.de-en.de', 'train.mono.1.de-en.de', 'train.mono.1.de-en.en',
+                           'train.mono.1.de-en.de']
 
 file_config['bow_1'] = ['train.de-en.de', 'train.mono.1.de-en.de', 'combined_train.bow.1.de-en.de', 'train.de-en.en',
                         'train.bidict.1.de-en.en', 'combined_train.bow.1.de-en.en','valid.de-en.de','valid.de-en.en',
@@ -273,8 +281,7 @@ def main():
     save_test_src, save_test_tgt = test_src + ".save", test_tgt + ".save"
     src_dict, tgt_dict = "save" + '.src.dict', "save" + '.tgt.dict'
 
-
-
+    save_train_mono_src, save_train_mono_tgt = train_mono_src + ".save", train_mono_tgt + ".save"
 
     print('Building source vocabulary...')
     dicts['src'] = utils.Dict([utils.PAD_WORD, utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD])
@@ -292,7 +299,8 @@ def main():
 
     print('Preparing test ...')
     test = makeData(test_src, test_tgt, dicts['src'], dicts['tgt'], save_test_src, save_test_tgt)
-
+    print('---------------------')
+    print('test dataaaaaa', test_src, test_tgt)
     print('Saving source vocabulary to \'' + src_dict + '\'...')
     dicts['src'].writeFile(src_dict)
 
@@ -311,7 +319,7 @@ def main():
         dicts['src'] = datas['dict']['src']
         dicts['tgt'] = datas['dict']['tgt']
 
-        train = makeData(train_src, train_tgt, dicts['src'], dicts['tgt'], save_train_src, save_train_tgt)
+        train = makeData(train_mono_src, train_mono_tgt, dicts['src'], dicts['tgt'], save_train_mono_src, save_train_mono_tgt)
     
         datas = {'train': train, 'valid': {},
                  'test': {}, 'dict': dicts}

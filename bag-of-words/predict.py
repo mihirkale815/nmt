@@ -1,7 +1,7 @@
 '''
  @Date  : 2017/12/28
  @Author: Shuming Ma
- @mail  : shumingma@pku.edu.cn 
+ @mail  : shumingma@pku.edu.cn
  @homepage: shumingma.com
 '''
 
@@ -10,10 +10,12 @@ import torch.utils.data
 import argparse
 import time
 import pickle
-
+import os
 import opts
 import utils
 import models
+from torch.autograd import Variable
+import codecs
 
 parser = argparse.ArgumentParser(description='train.py')
 parser.add_argument('-src_file', required=True, help="input file for the data")
@@ -25,6 +27,7 @@ opt = parser.parse_args()
 config = utils.read_config(opt.config)
 torch.manual_seed(opt.seed)
 opts.convert_to_config(opt, config)
+log_path = config.logF + opt.log + '/'
 
 # cuda
 use_cuda = torch.cuda.is_available() and len(opt.gpus) > 0
@@ -35,27 +38,86 @@ if use_cuda:
 
 
 def load_data():
+
     print('loading data...\n')
-    datas = pickle.load(open(config.data+'data.pkl', 'rb'))
+    datas = pickle.load(open('data/save_data.pkl', 'rb'))
+    datas['train']['length'] = int(datas['train']['length'] * opt.scale)
+
+    bi_testset = utils.BiDataset(datas['test'], char=config.char)
 
     src_vocab = datas['dict']['src']
     tgt_vocab = datas['dict']['tgt']
     config.src_vocab_size = src_vocab.size()
     config.tgt_vocab_size = tgt_vocab.size()
 
-    infos = {}
-    f_src = open(opt.src_file, 'r', encoding='utf8').read().strip().lower().split('\n')
-    f_tgt = open(opt.tgt_file, 'r', encoding='utf8').read().strip().lower().split('\n')
+    testset = bi_testset
 
-    srcIds = [src_vocab.convertToIdx(src_line.split(), utils.UNK_WORD) for src_line in f_src]
-    tgtIds = [tgt_vocab.convertToIdx(tgt_line.split(), utils.UNK_WORD, utils.BOS_WORD, utils.EOS_WORD) for tgt_line in f_tgt]
+    test_batch_size = config.batch_size
+    testloader = torch.utils.data.DataLoader(dataset=testset,
+                                              batch_size=test_batch_size,
+                                              shuffle=False,
+                                              num_workers=0,
+                                              collate_fn=utils.padding)
 
-    with open(opt.src_file+'.id', 'w') as src_id, open(opt.tgt_file+'.id', 'w') as tgt_id:
-        for ids in srcIds:
-            src_id.write(" ".join(list(map(str, ids)))+'\n')
-        for ids in tgtIds:
-            tgt_id.write(" ".join(list(map(str, ids)))+'\n')
+    return {'testset': testset, 'testloader': testloader,
+            'src_vocab': src_vocab, 'tgt_vocab': tgt_vocab}
 
+
+def eval_model(model, datas, params):
+
+    model.eval()
+    reference, candidate, source, alignments = [], [], [], []
+    count, total_count = 0, len(datas['validset'])
+    validloader = datas['validloader']
+    tgt_vocab = datas['tgt_vocab']
+
+    for src, tgt, src_len, tgt_len, original_src, original_tgt, data_type in validloader:
+
+        src = Variable(src, volatile=True)
+        src_len = Variable(src_len, volatile=True)
+        if config.use_cuda:
+            src = src.cuda()
+            src_len = src_len.cuda()
+
+        if config.beam_size > 1:
+            samples, alignment = model.beam_sample(src, src_len, beam_size=config.beam_size)
+        else:
+            samples, alignment = model.sample(src, src_len)
+
+        candidate += [tgt_vocab.convertToLabels(s, utils.EOS) for s in samples]
+        source += original_src
+        reference += original_tgt
+        if alignment is not None:
+            alignments += [align for align in alignment]
+
+        count += len(original_src)
+        utils.progress_bar(count, total_count)
+
+    if config.unk and config.attention != 'None':
+        cands = []
+        for s, c, align in zip(source, candidate, alignments):
+            cand = []
+            for word, idx in zip(c, align):
+                if word == utils.UNK_WORD and idx < len(s):
+                    try:
+                        cand.append(s[idx])
+                    except:
+                        cand.append(word)
+                        print("%d %d\n" % (len(s), idx))
+                else:
+                    cand.append(word)
+            cands.append(cand)
+        candidate = cands
+
+    with codecs.open(log_path+'candidate.txt', 'w+', 'utf-8') as f:
+        for i in range(len(candidate)):
+            f.write(" ".join(candidate[i])+'\n')
+
+    score = {}
+    for metric in config.metrics:
+        score[metric] = getattr(utils, metric)(reference, candidate, params['log_path'], params['log'], config)
+
+    return score
 
 
 def build_model(checkpoints):
@@ -68,6 +130,20 @@ def build_model(checkpoints):
         model.cuda()
 
     return model
+
+
+def build_log():
+    # log
+    if not os.path.exists(config.logF):
+        os.mkdir(config.logF)
+    if opt.log == '':
+        log_path = config.logF + str(int(time.time() * 1000)) + '/'
+    else:
+        log_path = config.logF + opt.log + '/'
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+    print_log = utils.print_log(log_path + 'log.txt')
+    return print_log, log_path
 
 
 def main():
@@ -90,8 +166,7 @@ def main():
     if opt.restore:
         params['updates'] = checkpoints['updates']
 
-    for i in range(1, config.epoch + 1):
-        train_model(model, datas, optim, i, params)
+    score = eval_model(model, datas, params)
 
     for metric in config.metrics:
         print_log("Best %s score: %.2f\n" % (metric, max(params[metric])))
