@@ -149,7 +149,8 @@ def train_model(model, datas, optim, epoch, params):
     for src, tgt, src_len, tgt_len, original_src, original_tgt, data_type in trainloader:
 
         if len(data_type) != config.batch_size :
-            raise Exception()
+            continue
+            #raise Exception()
 
         data_type = data_type[0]
 
@@ -182,7 +183,7 @@ def train_model(model, datas, optim, epoch, params):
                 params['mle_loss'] += torch.sum(mle_loss).data
                 params['label_loss'] += label_loss.data
                 #loss = (torch.sum(mle_loss) + min(max(0, config.alpha*(epoch-config.offset)), 1) * label_loss) / num_total.float()
-                loss = (torch.sum(mle_loss) + label_loss.sum()) / num_total.float()
+                loss = (torch.sum(mle_loss) + 0.0*label_loss.sum()) / num_total.float()
                 loss.backward()
             optim.step()
 
