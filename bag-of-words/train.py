@@ -179,6 +179,7 @@ def train_model(model, datas, optim, epoch, params):
             loss, (outputs,bow_outputs) = \
                     model(src, lengths, dec, targets, use_xent=use_xent, use_label = use_label)
             pred = torch.gather(bow_outputs.data,1,targets)
+            #print(bow_outputs[bow_outputs<0].size(),bow_outputs.size())
             num_correct = torch.sigmoid(pred.data).gt(0.5).masked_select(targets.ne(utils.PAD).data).sum()
             num_total = targets.ne(utils.PAD).data.sum()
             if config.max_split == 0:
@@ -186,7 +187,7 @@ def train_model(model, datas, optim, epoch, params):
                 params['mle_loss'] += torch.sum(mle_loss).data
                 params['label_loss'] += label_loss.data
                 #loss = (torch.sum(mle_loss) + min(max(0, config.alpha*(epoch-config.offset)), 1) * label_loss) / num_total.float()
-                loss = (torch.sum(mle_loss) + 0.0*label_loss.sum()) / num_total.float()
+                loss = (torch.sum(mle_loss) + label_loss.sum()) / num_total.float()
                 loss.backward()
             optim.step()
 
@@ -244,6 +245,26 @@ def eval_model(model, datas, params):
             src = src.cuda()
             src_len = src_len.cuda()
 
+        '''src = Variable(src)
+        tgt = Variable(tgt)
+        src_len = Variable(src_len)
+        if config.use_cuda:
+            src = src.cuda()
+            tgt = tgt.cuda()
+            src_len = src_len.cuda()
+        lengths, indices = torch.sort(src_len, dim=0, descending=True)
+        src = torch.index_select(src, dim=0, index=indices)
+        tgt = torch.index_select(tgt, dim=0, index=indices)
+        dec = tgt[:, :-1]
+        targets = tgt[:, 1:]
+
+
+        loss, (outputs, bow_outputs) = \
+            model(src, lengths, dec, targets, use_xent=True, use_label=True)
+        pred = torch.gather(bow_outputs.data, 1, targets)
+        num_correct = torch.sigmoid(pred.data).gt(0.5).masked_select(targets.ne(utils.PAD).data).sum()
+        num_total = targets.ne(utils.PAD).data.sum()'''
+#        print(100.0*num_correct/num_total)
         if config.beam_size > 1:
             samples, alignment = model.beam_sample(src, src_len, beam_size=config.beam_size)
         else:
@@ -305,7 +326,7 @@ def build_log():
         log_path = config.logF + opt.log + '/'
     if not os.path.exists(log_path):
         os.mkdir(log_path)
-    print_log = utils.print_log(log_path + 'log.txt')
+    print_log = utils.print_log(log_path + 'wow1_new_log.txt')
     return print_log, log_path
 
 

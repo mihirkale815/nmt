@@ -1,6 +1,6 @@
 logF: 'experiments/'
 refF: 'data/train.mono.1.de-en.de'
-use_mono: False
+use_mono: True
 epoch: 50
 batch_size: 4
 optim: 'adam'
@@ -31,6 +31,6 @@ attemb: False
 hops: 3
 schesamp: False
 length_norm: True
-emb: fasttext
+emb: fasttext2
 src_emb_file_path: data/fasttext/cc.de.300.vec
 tgt_emb_file_path: data/fasttext/cc.en.300.vec
