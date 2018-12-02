@@ -1,6 +1,6 @@
-python preprocess.py -id="baseline"  -report_every=1000
+python preprocess.py -id="bow_2" -data_folder="de-en"  -report_every=1000
 
 echo "Starting Main Training Loop"
 
-python train.py -config="fr_en.yaml" -mode="train"  -gpus=0
+python train.py -config="de-en.yaml" -mode="train"  -gpus=0
 

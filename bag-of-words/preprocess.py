@@ -28,46 +28,49 @@ parser.add_argument('-report_every', type=int, default=100000,
                     help="Report status every this many sentences")
 parser.add_argument('-vocab_path', type=str, default="save_data.pkl",
                     help="path to pickle of bilingual source vocabulary")
+parser.add_argument('-data_folder', type=str, default="de-en",
+                    help="path to data folder")
+
 opt = parser.parse_args()
 
 
 file_config = {}
 
-file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de', 'train.de-en.en', '',
-                           'combined_train.bow.0.de-en.en', 'valid.de-en.de','valid.de-en.de', 'test.de-en.de',
-                           'test.de-en.en']
+file_config['baseline'] = ['train.src-tgt.src', '', 'combined_train.bow.0.src-tgt.src', 'train.src-tgt.tgt', '',
+                           'combined_train.bow.0.src-tgt.tgt', 'valid.src-tgt.src','valid.src-tgt.src', 'test.src-tgt.src',
+                           'test.src-tgt.tgt']
 
-file_config['reverse_baseline'] = ['train.de-en.en', '', 'combined_train.bow.0.de-en.en', 'train.de-en.de', '',
-                           'combined_train.bow.0.de-en.de', 'valid.de-en.en', 'valid.de-en.en', 'test.de-en.en',
-                           'test.de-en.de']
+file_config['reverse_baseline'] = ['train.src-tgt.tgt', '', 'combined_train.bow.0.src-tgt.tgt', 'train.src-tgt.src', '',
+                           'combined_train.bow.0.src-tgt.src', 'valid.src-tgt.tgt', 'valid.src-tgt.tgt', 'test.src-tgt.tgt',
+                           'test.src-tgt.src']
 
-file_config['test_mono'] = ['train.de-en.en', '', 'combined_train.bow.0.de-en.en', 'train.de-en.de', '',
-                           'combined_train.bow.0.de-en.de', 'train.mono.1.de-en.de', 'train.mono.1.de-en.de', 'train.mono.1.de-en.en',
-                           'train.mono.1.de-en.de']
+file_config['test_mono'] = ['train.src-tgt.tgt', '', 'combined_train.bow.0.src-tgt.tgt', 'train.src-tgt.src', '',
+                           'combined_train.bow.0.src-tgt.src', 'train.mono.1.src-tgt.src', 'train.mono.1.src-tgt.src', 'train.mono.1.src-tgt.tgt',
+                           'train.mono.1.src-tgt.src']
 
-file_config['bow_1'] = ['train.de-en.de', 'train.mono.1.de-en.de', 'combined_train.bow.1.de-en.de', 'train.de-en.en',
-                        'train.bidict.1.de-en.en', 'combined_train.bow.1.de-en.en','valid.de-en.de','valid.de-en.en',
-                        'test.de-en.de','test.de-en.en']
+file_config['bow_1'] = ['train.src-tgt.src', 'train.mono.1.src-tgt.src', 'combined_train.bow.1.src-tgt.src', 'train.src-tgt.tgt',
+                        'train.bidict.1.src-tgt.tgt', 'combined_train.bow.1.src-tgt.tgt','valid.src-tgt.src','valid.src-tgt.tgt',
+                        'test.src-tgt.src','test.src-tgt.tgt']
 
-file_config['bow_2'] = ['train.de-en.de', 'train.mono.2.de-en.de', 'combined_train.bow.2.de-en.de', 'train.de-en.en',
-                        'train.bidict.2.de-en.en', 'combined_train.bow.2.de-en.en','valid.de-en.de','valid.de-en.en',
-                        'test.de-en.de','test.de-en.en']
+file_config['bow_2'] = ['train.src-tgt.src', 'train.mono.2.src-tgt.src', 'combined_train.bow.2.src-tgt.src', 'train.src-tgt.tgt',
+                        'train.bidict.2.src-tgt.tgt', 'combined_train.bow.2.src-tgt.tgt','valid.src-tgt.src','valid.src-tgt.tgt',
+                        'test.src-tgt.src','test.src-tgt.tgt']
 
-file_config['bow_4'] = ['train.de-en.de', 'train.mono.4.de-en.de', 'combined_train.bow.4.de-en.de', 'train.de-en.en',
-                        'train.bidict.4.de-en.en', 'combined_train.bow.4.de-en.en','valid.de-en.de','valid.de-en.en',
-                        'test.de-en.de','test.de-en.en']
+file_config['bow_4'] = ['train.src-tgt.src', 'train.mono.4.src-tgt.src', 'combined_train.bow.4.src-tgt.src', 'train.src-tgt.tgt',
+                        'train.bidict.4.src-tgt.tgt', 'combined_train.bow.4.src-tgt.tgt','valid.src-tgt.src','valid.src-tgt.tgt',
+                        'test.src-tgt.src','test.src-tgt.tgt']
 
-file_config['wow_1'] = ['train.de-en.de', 'train.bidict.1.de-en.de', 'combined_train.wow.1.de-en.de',
-                        'train.de-en.en', 'train.mono.1.de-en.en', 'combined_train.wow.1.de-en.en','valid.de-en.de',
-                        'valid.de-en.en','test.de-en.de','test.de-en.en']
+file_config['wow_1'] = ['train.src-tgt.src', 'train.bidict.1.src-tgt.src', 'combined_train.wow.1.src-tgt.src',
+                        'train.src-tgt.tgt', 'train.mono.1.src-tgt.tgt', 'combined_train.wow.1.src-tgt.tgt','valid.src-tgt.src',
+                        'valid.src-tgt.tgt','test.src-tgt.src','test.src-tgt.tgt']
 
-file_config['wow_2'] = ['train.de-en.de', 'train.bidict.2.de-en.de', 'combined_train.wow.2.de-en.de',
-                        'train.de-en.en', 'train.mono.2.de-en.en', 'combined_train.wow.2.de-en.en','valid.de-en.de',
-                        'valid.de-en.en','test.de-en.de','test.de-en.en']
+file_config['wow_2'] = ['train.src-tgt.src', 'train.bidict.2.src-tgt.src', 'combined_train.wow.2.src-tgt.src',
+                        'train.src-tgt.tgt', 'train.mono.2.src-tgt.tgt', 'combined_train.wow.2.src-tgt.tgt','valid.src-tgt.src',
+                        'valid.src-tgt.tgt','test.src-tgt.src','test.src-tgt.tgt']
 
-file_config['wow_4'] = ['train.de-en.de', 'train.bidict.4.de-en.de', 'combined_train.wow.4.de-en.de',
-                        'train.de-en.en', 'train.mono.4.de-en.en', 'combined_train.wow.4.de-en.en','valid.de-en.de',
-                        'valid.de-en.de','test.de-en.de','test.de-en.en']
+file_config['wow_4'] = ['train.src-tgt.src', 'train.bidict.4.src-tgt.src', 'combined_train.wow.4.src-tgt.src',
+                        'train.src-tgt.tgt', 'train.mono.4.src-tgt.tgt', 'combined_train.wow.4.src-tgt.tgt','valid.src-tgt.src',
+                        'valid.src-tgt.src','test.src-tgt.src','test.src-tgt.tgt']
 
 
 def makeVocabulary(filename, trun_length, filter_length, char, vocab, size):
@@ -261,25 +264,27 @@ def main():
     valid_src, valid_tgt, \
     test_src, test_tgt  = file_config[opt.id]
 
-    train_src = "data/" + train_src
+    folder_path = "data/" + opt.data_folder + "/"
+
+    train_src = folder_path + train_src
     if train_mono_src!='':
-        train_mono_src = "data/" + train_mono_src
-        train_mono_tgt = "data/" + train_mono_tgt
+        train_mono_src = folder_path + train_mono_src
+        train_mono_tgt = folder_path + train_mono_tgt
     else:
         train_mono_src = ''
         train_mono_tgt = ''
 
-    train_tgt = "data/" + train_tgt
-    #train_mono_tgt = "data/" + train_mono_tgt
+    train_tgt = folder_path + train_tgt
+    #train_mono_tgt = folder_path + train_mono_tgt
 
-    combined_train_src = "data/" + combined_train_src
-    combined_train_tgt = "data/" + combined_train_tgt
+    combined_train_src = folder_path + combined_train_src
+    combined_train_tgt = folder_path + combined_train_tgt
 
-    valid_src = "data/" + valid_src
-    valid_tgt = "data/" + valid_tgt
+    valid_src = folder_path + valid_src
+    valid_tgt = folder_path + valid_tgt
 
-    test_src = "data/" + test_src
-    test_tgt = "data/" + test_tgt
+    test_src = folder_path + test_src
+    test_tgt = folder_path + test_tgt
 
     save_train_src, save_train_tgt = train_src + ".save", train_tgt + ".save"
     save_valid_src, save_valid_tgt = valid_src + ".save", valid_tgt + ".save"
@@ -305,7 +310,7 @@ def main():
     print('Preparing test ...')
     test = makeData(test_src, test_tgt, dicts['src'], dicts['tgt'], save_test_src, save_test_tgt)
     print('---------------------')
-    print('test dataaaaaa', test_src, test_tgt)
+    print('test data', test_src, test_tgt)
     print('Saving source vocabulary to \'' + src_dict + '\'...')
     dicts['src'].writeFile(src_dict)
 
@@ -314,13 +319,13 @@ def main():
 
     datas = {'train': train, 'valid': valid,
              'test': test, 'dict': dicts}
-    pickle.dump(datas, open('data/save_data.pkl', 'wb'))
+    pickle.dump(datas, open('data/'+opt.data_folder+'/'+'save_data.pkl', 'wb'))
 
     if train_mono_src!= ''  and train_mono_tgt!= '' :
         print('Preparing mono training ...')
 
         # Getting the vocabulary from Bi-dataset
-        datas = pickle.load(open("data/"+opt.vocab_path, 'rb'))
+        datas = pickle.load(open(folder_path+opt.vocab_path, 'rb'))
         dicts['src'] = datas['dict']['src']
         dicts['tgt'] = datas['dict']['tgt']
 
@@ -328,7 +333,7 @@ def main():
     
         datas = {'train': train, 'valid': {},
                  'test': {}, 'dict': dicts}
-        pickle.dump(datas, open('data/save_mono_data.pkl', 'wb'))
+        pickle.dump(datas, open('data/'+opt.data_folder+'/'+'save_mono_data.pkl', 'wb'))
 
 
 if __name__ == "__main__":

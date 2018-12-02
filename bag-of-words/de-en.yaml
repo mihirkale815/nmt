@@ -1,11 +1,11 @@
-logF: 'experiments/'
-language_folder:'de-en'
+language_folder: 'de-en'
 src_emb_file_path: data/de-en/fasttext/cc.de.300.vec
 tgt_emb_file_path: data/de-en/fasttext/cc.en.300.vec
 refF: 'data/de-en/test.src-tgt.tgt'
 use_mono: False
 epoch: 50
 batch_size: 32
+logF: 'experiments/'
 optim: 'adam'
 cell: 'lstm'
 attention: 'bahdanau'

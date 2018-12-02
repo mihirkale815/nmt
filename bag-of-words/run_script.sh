@@ -1,28 +1,34 @@
 echo "Splitting source data into monolingual and subset for parallel corpora"
-cd data
-python ../split_files.py original_train.de-en.de  original_train.de-en.en   de-en 10000
 
-python ../predict_mono_using_bi_dict.py de-en
+language_folder="de-en"
 
-cat train.de-en.de > combined_train.bow.0.de-en.de
-cat train.de-en.en  > combined_train.bow.0.de-en.en
+cd data/$language_folder
 
-cat train.de-en.de train.mono.1.de-en.de > combined_train.bow.1.de-en.de
-cat train.de-en.en train.bidict.1.de-en.en > combined_train.bow.1.de-en.en
+echo "$language_folder"
 
-cat train.de-en.de train.mono.2.de-en.de > combined_train.bow.2.de-en.de
-cat train.de-en.en train.bidict.2.de-en.en > combined_train.bow.2.de-en.en
+python ../../split_files.py original_train.src-tgt.src  original_train.src-tgt.tgt src-tgt 10000
 
-cat train.de-en.de train.mono.4.de-en.de > combined_train.bow.4.de-en.de
-cat train.de-en.en train.bidict.4.de-en.en > combined_train.bow.4.de-en.en
+python ../../predict_mono_using_bi_dict.py src-tgt
 
-cat train.de-en.de train.bidict.1.de-en.de > combined_train.wow.1.de-en.de
-cat train.de-en.en train.mono.1.de-en.en > combined_train.wow.1.de-en.en
+cat train.src-tgt.src > combined_train.bow.0.src-tgt.src
+cat train.src-tgt.tgt  > combined_train.bow.0.src-tgt.tgt
 
-cat train.de-en.de train.bidict.2.de-en.de > combined_train.wow.2.de-en.de
-cat train.de-en.en train.mono.2.de-en.en > combined_train.wow.2.de-en.en
+cat train.src-tgt.src train.mono.1.src-tgt.src > combined_train.bow.1.src-tgt.src
+cat train.src-tgt.tgt train.bidict.1.src-tgt.tgt > combined_train.bow.1.src-tgt.tgt
 
-cat train.de-en.de train.bidict.4.de-en.de > combined_train.wow.4.de-en.de
-cat train.de-en.en train.mono.4.de-en.en > combined_train.wow.4.de-en.en
+cat train.src-tgt.src train.mono.2.src-tgt.src > combined_train.bow.2.src-tgt.src
+cat train.src-tgt.tgt train.bidict.2.src-tgt.tgt > combined_train.bow.2.src-tgt.tgt
+
+cat train.src-tgt.src train.mono.4.src-tgt.src > combined_train.bow.4.src-tgt.src
+cat train.src-tgt.tgt train.bidict.4.src-tgt.tgt > combined_train.bow.4.src-tgt.tgt
+
+cat train.src-tgt.src train.bidict.1.src-tgt.src > combined_train.wow.1.src-tgt.src
+cat train.src-tgt.tgt train.mono.1.src-tgt.tgt > combined_train.wow.1.src-tgt.tgt
+
+cat train.src-tgt.src train.bidict.2.src-tgt.src > combined_train.wow.2.src-tgt.src
+cat train.src-tgt.tgt train.mono.2.src-tgt.tgt > combined_train.wow.2.src-tgt.tgt
+
+cat train.src-tgt.src train.bidict.4.src-tgt.src > combined_train.wow.4.src-tgt.src
+cat train.src-tgt.tgt train.mono.4.src-tgt.tgt > combined_train.wow.4.src-tgt.tgt
 
 

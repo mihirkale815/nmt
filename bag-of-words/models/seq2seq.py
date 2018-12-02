@@ -79,7 +79,7 @@ class seq2seq(nn.Module):
             self.encoder.embedding.weight.data.copy_(torch.from_numpy(src_embedding))
             tgt_embedding = create_embed_matrix(config.tgt_emb_file_path,config.tgt_vocab)
             self.decoder.embedding.weight.data.copy_(torch.from_numpy(tgt_embedding))
-            self.bow_decoder.embedding.weight.data.copy_(torch.from_numpy(tgt_embedding))
+            self.bow_decoder.linear.weight.data.copy_(torch.from_numpy(tgt_embedding))
 
         #self.bow_decoder.linear.weight = self.decoder.linear.weight
         self.log_softmax = nn.LogSoftmax(dim=-1)

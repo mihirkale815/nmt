@@ -41,7 +41,7 @@ if use_cuda:
 
 def load_data():
     print('loading data...\n')
-    datas = pickle.load(open('data/save_data.pkl', 'rb'))
+    datas = pickle.load(open('data/'+config.language_folder+'/'+'save_data.pkl', 'rb'))
     datas['train']['length'] = int(datas['train']['length'] * opt.scale)
     
     bi_trainset = utils.BiDataset(datas['train'], char=config.char)
@@ -49,7 +49,7 @@ def load_data():
 
     if config.use_mono:
 
-        mono_datas = pickle.load(open('data/save_mono_data.pkl', 'rb'))
+        mono_datas = pickle.load(open('data/'+config.language_folder+'/'+'save_mono_data.pkl', 'rb'))
         mono_datas['train']['length'] = int(mono_datas['train']['length'] * opt.scale)
 
         mono_trainset = utils.BiDataset(mono_datas['train'], data_type="mono")
