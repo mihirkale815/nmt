@@ -73,12 +73,14 @@ class seq2seq(nn.Module):
             self.decoder = decoder
         else:
             self.decoder = models.rnn_decoder(config, embedding=tgt_embedding, use_attention=use_attention)
+        self.bow_decoder = models.bow_decoder(config)
         if config.emb == 'fasttext':
             src_embedding = create_embed_matrix(config.src_emb_file_path,config.src_vocab)
             self.encoder.embedding.weight.data.copy_(torch.from_numpy(src_embedding))
             tgt_embedding = create_embed_matrix(config.tgt_emb_file_path,config.tgt_vocab)
             self.decoder.embedding.weight.data.copy_(torch.from_numpy(tgt_embedding))
-        self.bow_decoder = models.bow_decoder(config)
+            self.bow_decoder.embedding.weight.data.copy_(torch.from_numpy(tgt_embedding))
+
         #self.bow_decoder.linear.weight = self.decoder.linear.weight
         self.log_softmax = nn.LogSoftmax(dim=-1)
         self.softmax = nn.Softmax(dim=-1)
@@ -109,7 +111,7 @@ class seq2seq(nn.Module):
 #        mask_scores = self.softmax(mask_scores)
         #sum_scores = mask_scores.sum(0)
         labels = self.one_hot(targets, self.config.tgt_vocab_size).sum(0)
-        labels = torch.ge(labels, 0).float()
+        labels = torch.gt(labels, 0).float()
         label_loss = self.multi_label_loss(scores, labels)
         return label_loss
 
@@ -140,8 +142,8 @@ class seq2seq(nn.Module):
             xent_loss = self.compute_xent_loss(outputs, targets)
         if use_label:
             bow_outputs = self.bow_decoder(contexts)
-            #label_loss = self.compute_label_loss(bow_outputs, targets)
-            label_loss = self.compute_label_loss(outputs.sum(0), targets)
+            label_loss = self.compute_label_loss(bow_outputs, targets)
+            #label_loss = self.compute_label_loss(outputs.sum(0), targets)
 
 
         loss = (xent_loss, label_loss)
