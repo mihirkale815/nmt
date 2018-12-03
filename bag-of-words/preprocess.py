@@ -34,7 +34,7 @@ opt = parser.parse_args()
 file_config = {}
 
 file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de', 'train.de-en.en', '',
-                           'combined_train.bow.0.de-en.en', 'valid.de-en.de','valid.de-en.de', 'test.de-en.de',
+                           'combined_train.bow.0.de-en.en', 'valid.de-en.de','valid.de-en.en', 'test.de-en.de',
                            'test.de-en.en']
 
 file_config['reverse_baseline'] = ['train.de-en.en', '', 'combined_train.bow.0.de-en.en', 'train.de-en.de', '',
@@ -67,7 +67,7 @@ file_config['wow_2'] = ['train.de-en.de', 'train.bidict.2.de-en.de', 'combined_t
 
 file_config['wow_4'] = ['train.de-en.de', 'train.bidict.4.de-en.de', 'combined_train.wow.4.de-en.de',
                         'train.de-en.en', 'train.mono.4.de-en.en', 'combined_train.wow.4.de-en.en','valid.de-en.de',
-                        'valid.de-en.de','test.de-en.de','test.de-en.en']
+                        'valid.de-en.en','test.de-en.de','test.de-en.en']
 
 
 def makeVocabulary(filename, trun_length, filter_length, char, vocab, size):

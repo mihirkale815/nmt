@@ -45,7 +45,7 @@ def load_data():
     datas['train']['length'] = int(datas['train']['length'] * opt.scale)
     
     bi_trainset = utils.BiDataset(datas['train'], char=config.char)
-    bi_validset = utils.BiDataset(datas['test'], char=config.char)
+    bi_validset = utils.BiDataset(datas['valid'], char=config.char)
 
     if config.use_mono:
 
@@ -156,9 +156,19 @@ def train_model(model, datas, optim, epoch, params):
             #raise Exception()
 
         data_type = data_type[0]
+        use_xent = True
+        use_label = True
+        #use_xent = True if data_type == 'bi' else False
+        #if epoch < 20:
+         #   use_label = True
+          #  use_xent = False
+        #else:
+         #   if data_type != 'bi':
+           #     continue
+          #  use_label = False
+          #  use_xent = True
 
-        use_xent = True if data_type == 'bi' else False
-        use_label = True #if data_type == 'mono' else False
+        #use_label = True #if data_type == 'mono' else False
 
         model.zero_grad()
 
@@ -187,7 +197,7 @@ def train_model(model, datas, optim, epoch, params):
                 params['mle_loss'] += torch.sum(mle_loss).data
                 params['label_loss'] += label_loss.data
                 #loss = (torch.sum(mle_loss) + min(max(0, config.alpha*(epoch-config.offset)), 1) * label_loss) / num_total.float()
-                loss = (torch.sum(mle_loss) + label_loss.sum()) / num_total.float()
+                loss = (torch.sum(mle_loss) + 0.0*label_loss.sum()) / num_total.float()
                 loss.backward()
             optim.step()
 
@@ -326,7 +336,7 @@ def build_log():
         log_path = config.logF + opt.log + '/'
     if not os.path.exists(log_path):
         os.mkdir(log_path)
-    print_log = utils.print_log(log_path + 'wow1_new_log.txt')
+    print_log = utils.print_log(log_path + 'baseline_valid_log.txt')
     return print_log, log_path
 
 
