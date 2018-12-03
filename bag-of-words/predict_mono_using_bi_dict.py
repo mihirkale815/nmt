@@ -26,6 +26,14 @@ if __name__ == "__main__":
 
 	bi_dict,rev_bi_dict = get_bilingual_dict(bi_dict_path)
 
+	mono_file_path = ".".join(["test", lang_pair, src_suf])
+	out_tgt_file = ".".join(["test", "bidict", lang_pair, tgt_suf])
+	predict_mono(mono_file_path, bi_dict, out_tgt_file)
+
+	mono_file_path = ".".join(["valid", lang_pair, src_suf])
+	out_tgt_file = ".".join(["valid", "bidict", lang_pair, tgt_suf])
+	predict_mono(mono_file_path, bi_dict, out_tgt_file)
+
 	for mult in (1,2,4):
 		mono_file_path = ".".join(["train","mono",str(mult),lang_pair,src_suf])
 		out_tgt_file = ".".join(["train", "bidict",str(mult), lang_pair, tgt_suf])

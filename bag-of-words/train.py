@@ -45,7 +45,7 @@ def load_data():
     datas['train']['length'] = int(datas['train']['length'] * opt.scale)
     
     bi_trainset = utils.BiDataset(datas['train'], char=config.char)
-    bi_validset = utils.BiDataset(datas['test'], char=config.char)
+    bi_validset = utils.BiDataset(datas['valid'], char=config.char)
 
     if config.use_mono:
 
@@ -157,7 +157,7 @@ def train_model(model, datas, optim, epoch, params):
 
         data_type = data_type[0]
 
-        use_xent = True if data_type == 'bi' else False
+        use_xent = True #if data_type == 'bi' else False
         use_label = True #if data_type == 'mono' else False
 
         model.zero_grad()

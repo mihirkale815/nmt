@@ -37,7 +37,7 @@ opt = parser.parse_args()
 file_config = {}
 
 file_config['baseline'] = ['train.src-tgt.src', '', 'combined_train.bow.0.src-tgt.src', 'train.src-tgt.tgt', '',
-                           'combined_train.bow.0.src-tgt.tgt', 'valid.src-tgt.src','valid.src-tgt.src', 'test.src-tgt.src',
+                           'combined_train.bow.0.src-tgt.tgt', 'valid.src-tgt.src','valid.src-tgt.tgt', 'test.src-tgt.src',
                            'test.src-tgt.tgt']
 
 file_config['reverse_baseline'] = ['train.src-tgt.tgt', '', 'combined_train.bow.0.src-tgt.tgt', 'train.src-tgt.src', '',

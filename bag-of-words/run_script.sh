@@ -1,6 +1,6 @@
 echo "Splitting source data into monolingual and subset for parallel corpora"
 
-language_folder="de-en"
+language_folder="es-en"
 
 cd data/$language_folder
 
