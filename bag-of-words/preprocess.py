@@ -37,13 +37,25 @@ file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de'
                            'combined_train.bow.0.de-en.en', 'valid.de-en.de','valid.de-en.en', 'test.de-en.de',
                            'test.de-en.en']
 
+file_config['baseline_20_de'] = ['combined_train_20.de-en.de', '', 'combined_train_20.de-en.de', 'combined_train_20.de-en.en', '',
+                           'combined_train_20.de-en.en', 'valid.de-en.de','valid.de-en.en', 'test.de-en.de',
+                           'test.de-en.en']
+
+file_config['baseline_es'] = ['es-en/train.src-tgt.src', '', 'es-en/combined_train.bow.0.src-tgt.src', 'es-en/train.src-tgt.tgt', '',
+                           'es-en/combined_train.bow.0.src-tgt.tgt', 'es-en/valid.src-tgt.src','es-en/valid.src-tgt.tgt', 'es-en/test.src-tgt.src',
+                           'es-en/test.src-tgt.tgt']
+
+file_config['baseline_20_es'] = ['es-en/combined_train.20k.src-tgt.src', '', 'es-en/combined_train.20k.src-tgt.src', 'es-en/combined_train.20k.src-tgt.tgt', '',
+                           'es-en/combined_train.20k.src-tgt.tgt', 'es-en/valid.src-tgt.src','es-en/valid.src-tgt.tgt', 'es-en/test.src-tgt.src',
+                           'es-en/test.src-tgt.tgt']
+
 file_config['reverse_baseline'] = ['train.de-en.en', '', 'combined_train.bow.0.de-en.en', 'train.de-en.de', '',
-                           'combined_train.bow.0.de-en.de', 'valid.de-en.en', 'valid.de-en.en', 'test.de-en.en',
+                           'combined_train.bow.0.de-en.de', 'valid.de-en.en', 'valid.de-en.de', 'test.de-en.en',
                            'test.de-en.de']
 
-file_config['test_mono'] = ['train.de-en.en', '', 'combined_train.bow.0.de-en.en', 'train.de-en.de', '',
-                           'combined_train.bow.0.de-en.de', 'train.mono.1.de-en.de', 'train.mono.1.de-en.de', 'train.mono.1.de-en.en',
-                           'train.mono.1.de-en.de']
+file_config['test_mono'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de', 'train.de-en.en', '',
+                           'combined_train.bow.0.de-en.en', 'valid.de-en.de', 'valid.de-en.en', 'test.de-en.de',
+                           'test.de-en.en']
 
 file_config['bow_1'] = ['train.de-en.de', 'train.mono.1.de-en.de', 'combined_train.bow.1.de-en.de', 'train.de-en.en',
                         'train.bidict.1.de-en.en', 'combined_train.bow.1.de-en.en','valid.de-en.de','valid.de-en.en',
@@ -61,14 +73,29 @@ file_config['wow_1'] = ['train.de-en.de', 'train.bidict.1.de-en.de', 'combined_t
                         'train.de-en.en', 'train.mono.1.de-en.en', 'combined_train.wow.1.de-en.en','valid.de-en.de',
                         'valid.de-en.en','test.de-en.de','test.de-en.en']
 
+file_config['wow_1_es'] = ['es-en/train.src-tgt.src', 'es-en/train.bidict.1.src-tgt.src', 'es-en/combined_train.wow.1.src-tgt.src',
+                        'es-en/train.src-tgt.tgt', 'es-en/train.mono.1.src-tgt.tgt', 'es-en/combined_train.wow.1.src-tgt.tgt','es-en/valid.src-tgt.src',
+                        'es-en/valid.src-tgt.tgt','es-en/test.src-tgt.src','es-en/test.src-tgt.tgt']
+
 file_config['wow_2'] = ['train.de-en.de', 'train.bidict.2.de-en.de', 'combined_train.wow.2.de-en.de',
                         'train.de-en.en', 'train.mono.2.de-en.en', 'combined_train.wow.2.de-en.en','valid.de-en.de',
                         'valid.de-en.en','test.de-en.de','test.de-en.en']
+
+file_config['wow_2_es'] = ['es-en/train.src-tgt.src', 'es-en/train.bidict.2.src-tgt.src', 'es-en/combined_train.wow.2.src-tgt.src',
+                        'es-en/train.src-tgt.tgt', 'es-en/train.mono.2.src-tgt.tgt', 'es-en/combined_train.wow.2.src-tgt.tgt','es-en/valid.src-tgt.src',
+                        'es-en/valid.src-tgt.tgt','es-en/test.src-tgt.src','es-en/test.src-tgt.tgt']
 
 file_config['wow_4'] = ['train.de-en.de', 'train.bidict.4.de-en.de', 'combined_train.wow.4.de-en.de',
                         'train.de-en.en', 'train.mono.4.de-en.en', 'combined_train.wow.4.de-en.en','valid.de-en.de',
                         'valid.de-en.en','test.de-en.de','test.de-en.en']
 
+file_config['wow_4_es'] = ['es-en/train.src-tgt.src', 'es-en/train.bidict.4.src-tgt.src', 'es-en/combined_train.wow.4.src-tgt.src',
+                        'es-en/train.src-tgt.tgt', 'es-en/train.mono.4.src-tgt.tgt', 'es-en/combined_train.wow.4.src-tgt.tgt','es-en/valid.src-tgt.src',
+                        'es-en/valid.src-tgt.tgt','es-en/test.src-tgt.src','es-en/test.src-tgt.tgt']
+
+file_config['rev_wow_1'] = ['train.de-en.de', 'train.mono.1.de-en.de', 'combined_train_rev.1.de-en.de',
+                        'train.de-en.en', 'train.bidict.1.de-en.en', 'combined_train_rev.1.de-en.en','valid.de-en.de',
+                        'valid.de-en.en','test.de-en.de','test.de-en.en']
 
 def makeVocabulary(filename, trun_length, filter_length, char, vocab, size):
 

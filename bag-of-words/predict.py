@@ -18,8 +18,8 @@ from torch.autograd import Variable
 import codecs
 
 parser = argparse.ArgumentParser(description='train.py')
-parser.add_argument('-src_file', required=True, help="input file for the data")
-parser.add_argument('-tgt_file', required=True, help="output file for the data")
+#parser.add_argument('-src_file', required=True, help="input file for the data")
+#parser.add_argument('-tgt_file', required=True, help="output file for the data")
 
 opts.model_opts(parser)
 
@@ -67,8 +67,8 @@ def eval_model(model, datas, params):
 
     model.eval()
     reference, candidate, source, alignments = [], [], [], []
-    count, total_count = 0, len(datas['validset'])
-    validloader = datas['validloader']
+    count, total_count = 0, len(datas['testset'])
+    validloader = datas['testloader']
     tgt_vocab = datas['tgt_vocab']
 
     for src, tgt, src_len, tgt_len, original_src, original_tgt, data_type in validloader:
@@ -109,7 +109,7 @@ def eval_model(model, datas, params):
             cands.append(cand)
         candidate = cands
 
-    with codecs.open(log_path+'candidate.txt', 'w+', 'utf-8') as f:
+    with codecs.open(log_path+'baseline_es_candidate.txt', 'w+', 'utf-8') as f:
         for i in range(len(candidate)):
             f.write(" ".join(candidate[i])+'\n')
 
@@ -156,7 +156,8 @@ def main():
 
     datas = load_data()
     print_log, log_path = build_log()
-    model, optim, print_log = build_model(checkpoints, print_log)
+    #model = checkpoints['model']
+    model = build_model(checkpoints)
 
     params = {'updates': 0, 'report_loss': 0, 'report_total': 0,
               'report_correct': 0, 'report_time': time.time(),
@@ -168,8 +169,8 @@ def main():
 
     score = eval_model(model, datas, params)
 
-    for metric in config.metrics:
-        print_log("Best %s score: %.2f\n" % (metric, max(params[metric])))
+#    for metric in config.metrics:
+ #       print_log("Best %s score: %.2f\n" % (metric, max(params[metric])))
 
 
 if __name__ == '__main__':
