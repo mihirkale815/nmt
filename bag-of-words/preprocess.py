@@ -36,7 +36,7 @@ file_config = {}
 file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de', 'train.de-en.en', '',
                            'combined_train.bow.0.de-en.en', 'valid.de-en.de','valid.de-en.en', 'test.de-en.de',
                            'test.de-en.en']
-file_config['copied'] = ['combined_train.copy.1.de-en.de','','combined_train.copy.1.de-en.de','combined_train.wow.1.de-en.en','train.mono.1.de-en.en','combined_train.wow.1.de-en.en','valid.de-en.de','valid.de-en.en','test.de-en.de','test.de-en.en']
+file_config['copied'] = ['combined_train.copy.1.de-en.de','','combined_train.copy.1.de-en.de','combined_train.wow.1.de-en.en','','combined_train.wow.1.de-en.en','valid.de-en.de','valid.de-en.en','test.de-en.de','test.de-en.en']
 
 
 file_config['baseline_20_de'] = ['combined_train_20.de-en.de', '', 'combined_train_20.de-en.de', 'combined_train_20.de-en.en', '',
