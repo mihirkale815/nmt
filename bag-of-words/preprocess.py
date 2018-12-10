@@ -37,6 +37,8 @@ file_config['baseline'] = ['train.de-en.de', '', 'combined_train.bow.0.de-en.de'
                            'combined_train.bow.0.de-en.en', 'valid.de-en.de','valid.de-en.en', 'test.de-en.de',
                            'test.de-en.en']
 
+file_config['baseline_bidict_es'] = 
+
 file_config['baseline_20_de'] = ['combined_train_20.de-en.de', '', 'combined_train_20.de-en.de', 'combined_train_20.de-en.en', '',
                            'combined_train_20.de-en.en', 'valid.de-en.de','valid.de-en.en', 'test.de-en.de',
                            'test.de-en.en']
@@ -96,6 +98,10 @@ file_config['wow_4_es'] = ['es-en/train.src-tgt.src', 'es-en/train.bidict.4.src-
 file_config['rev_wow_1'] = ['train.de-en.de', 'train.mono.1.de-en.de', 'combined_train_rev.1.de-en.de',
                         'train.de-en.en', 'train.bidict.1.de-en.en', 'combined_train_rev.1.de-en.en','valid.de-en.de',
                         'valid.de-en.en','test.de-en.de','test.de-en.en']
+
+file_config['wow_1_un_es'] = ['es-en/train.src-tgt.src', 'es-en/train.bidict.un.1.src-tgt.src', 'es-en/combined_train.un.wow.1.src-tgt.src',
+                        'es-en/train.src-tgt.tgt', 'es-en/train.mono.un.1.src-tgt.tgt', 'es-en/combined_train.un.wow.1.src-tgt.tgt','es-en/valid.src-tgt.src',
+                        'es-en/valid.src-tgt.tgt','es-en/test.src-tgt.src','es-en/test.src-tgt.tgt']
 
 def makeVocabulary(filename, trun_length, filter_length, char, vocab, size):
 
